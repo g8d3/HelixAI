@@ -66,7 +66,7 @@ const initialModelForm: ModelFormData = {
   providerId: "",
   displayName: "",
   provider: "openai",
-  cost: 5000, // Updated initial cost
+  cost: 500000, // Updated initial cost to cents
   enabled: true,
   contextWindow: null,
   maxTokens: null,
@@ -396,7 +396,7 @@ export default function AdminPage() {
                         <TableCell>{model.providerId}</TableCell>
                         <TableCell>{model.displayName}</TableCell>
                         <TableCell>{model.provider}</TableCell>
-                        <TableCell>{(model.cost / 1000).toFixed(3)} credits/1K tokens</TableCell>
+                        <TableCell>${(model.cost / 100000).toFixed(3)}/1K tokens</TableCell>
                         <TableCell>
                           <Switch
                             checked={model.enabled}
@@ -486,14 +486,14 @@ export default function AdminPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Cost per 1K tokens</Label>
+                        <Label>Cost per 1K tokens ($)</Label>
                         <Input
                           type="number"
                           min="0.001"
                           step="0.001"
-                          value={(modelForm.cost / 1000).toFixed(3)}
+                          value={(modelForm.cost / 100000).toFixed(3)}
                           onChange={(e) =>
-                            setModelForm({ ...modelForm, cost: Math.round(parseFloat(e.target.value) * 1000) })
+                            setModelForm({ ...modelForm, cost: Math.round(parseFloat(e.target.value) * 100000) })
                           }
                         />
                       </div>
