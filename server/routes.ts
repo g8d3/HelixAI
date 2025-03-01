@@ -4,20 +4,9 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { querySchema, updateUserSchema } from "@shared/schema";
 import { ZodError } from "zod";
+import { generateResponse, MODEL_CONFIGS } from "./services/models";
 
-const MOCK_MODELS = {
-  "gpt-3.5-turbo": { cost: 5, maxLength: 50 },
-  "gpt-4": { cost: 20, maxLength: 100 },
-  "claude-2": { cost: 15, maxLength: 75 },
-  "palm-2": { cost: 10, maxLength: 60 },
-};
-
-function generateMockResponse(prompt: string, model: string): string {
-  const config = MOCK_MODELS[model as keyof typeof MOCK_MODELS];
-  const words = prompt.split(" ");
-  const truncatedPrompt = words.slice(0, config.maxLength).join(" ");
-  return `${model} response to: ${truncatedPrompt}`;
-}
+// Removed MOCK_MODELS and generateMockResponse
 
 function isAdmin(req: Express.Request) {
   return req.user?.isAdmin === true;
@@ -62,13 +51,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { prompt, model } = querySchema.parse(req.body);
       const user = req.user!;
 
-      const modelConfig = MOCK_MODELS[model as keyof typeof MOCK_MODELS];
+      const modelConfig = MODEL_CONFIGS[model];
+      if (!modelConfig) {
+        return res.status(400).json({ error: "Invalid model selected" });
+      }
+
       if (user.credits < modelConfig.cost) {
         return res.status(402).json({ error: "Insufficient credits" });
       }
 
-      const response = generateMockResponse(prompt, model);
-      const tokens = prompt.length + response.length;
+      const { response, tokens } = await generateResponse(prompt, model);
 
       const query = await storage.createQuery({
         userId: user.id,
@@ -92,7 +84,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof ZodError) {
         res.status(400).json({ error: error.errors });
       } else {
-        res.status(500).json({ error: "Internal server error" });
+        console.error("Error processing query:", error);
+        res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
       }
     }
   });
