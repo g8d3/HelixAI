@@ -66,7 +66,7 @@ const initialModelForm: ModelFormData = {
   providerId: "",
   displayName: "",
   provider: "openai",
-  cost: 5,
+  cost: 5000, // Updated initial cost
   enabled: true,
   contextWindow: null,
   maxTokens: null,
@@ -396,7 +396,7 @@ export default function AdminPage() {
                         <TableCell>{model.providerId}</TableCell>
                         <TableCell>{model.displayName}</TableCell>
                         <TableCell>{model.provider}</TableCell>
-                        <TableCell>{model.cost} credits</TableCell>
+                        <TableCell>{(model.cost / 1000).toFixed(3)} credits/1K tokens</TableCell>
                         <TableCell>
                           <Switch
                             checked={model.enabled}
@@ -486,13 +486,14 @@ export default function AdminPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Cost (credits)</Label>
+                        <Label>Cost per 1K tokens</Label>
                         <Input
                           type="number"
-                          min="1"
-                          value={modelForm.cost}
+                          min="0.001"
+                          step="0.001"
+                          value={(modelForm.cost / 1000).toFixed(3)}
                           onChange={(e) =>
-                            setModelForm({ ...modelForm, cost: parseInt(e.target.value) })
+                            setModelForm({ ...modelForm, cost: Math.round(parseFloat(e.target.value) * 1000) })
                           }
                         />
                       </div>
@@ -547,7 +548,7 @@ export default function AdminPage() {
                             !modelForm.providerId ||
                             !modelForm.displayName ||
                             !modelForm.provider ||
-                            modelForm.cost < 1
+                            modelForm.cost < 1000
                           }
                         >
                           {editingModel ? 'Update' : 'Create'}
@@ -577,7 +578,6 @@ export default function AdminPage() {
                   <TableRow>
                     <TableHead>ID</TableHead>
                     <TableHead>Username</TableHead>
-                    <TableHead>Credits</TableHead>
                     <TableHead>Admin</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
@@ -589,25 +589,8 @@ export default function AdminPage() {
                       <TableCell>{u.username}</TableCell>
                       <TableCell>
                         {editingUser?.id === u.id ? (
-                          <Input
-                            type="number"
-                            value={editingUser.credits}
-                            onChange={(e) =>
-                              setEditingUser({
-                                ...editingUser,
-                                credits: parseInt(e.target.value),
-                              })
-                            }
-                            className="w-24"
-                          />
-                        ) : (
-                          u.credits
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {editingUser?.id === u.id ? (
                           <Switch
-                            checked={editingModel?.enabled ?? false} //Fixed potential error here
+                            checked={editingUser.isAdmin}
                             onCheckedChange={(checked) =>
                               setEditingUser({
                                 ...editingUser,
@@ -701,3 +684,13 @@ export default function AdminPage() {
     </div>
   );
 }
+
+type UpsertModel = {
+  providerId: string;
+  displayName: string;
+  provider: "openai" | "anthropic" | "palm";
+  cost: number;
+  enabled: boolean;
+  contextWindow?: number;
+  maxTokens?: number;
+};

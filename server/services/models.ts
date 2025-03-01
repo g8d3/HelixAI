@@ -34,8 +34,8 @@ async function fetchOpenAIModels() {
         word.charAt(0).toUpperCase() + word.slice(1)
       ).join(' '),
       provider: 'openai' as const,
-      // Cost per 1K tokens (rough estimates)
-      cost: model.id.includes('gpt-4') ? 0.03 : 0.002,
+      // Convert cost per 1K tokens to integer (multiply by 1000)
+      cost: model.id.includes('gpt-4') ? 30000 : 2000,
       contextWindow: model.context_window,
       maxTokens: model.context_window,
     }));
@@ -48,7 +48,7 @@ async function fetchAnthropicModels() {
       providerId: 'claude-2',
       displayName: 'Claude 2',
       provider: 'anthropic' as const,
-      cost: 0.01, // Cost per 1K tokens
+      cost: 10000, // Cost per 1K tokens * 1000
       contextWindow: 100000,
       maxTokens: 100000,
     },
@@ -56,7 +56,7 @@ async function fetchAnthropicModels() {
       providerId: 'claude-instant-1',
       displayName: 'Claude Instant',
       provider: 'anthropic' as const,
-      cost: 0.003, // Cost per 1K tokens
+      cost: 3000, // Cost per 1K tokens * 1000
       contextWindow: 100000,
       maxTokens: 100000,
     },
@@ -70,7 +70,7 @@ async function fetchPaLMModels() {
       providerId: 'gemini-pro',
       displayName: 'Gemini Pro',
       provider: 'palm' as const,
-      cost: 0.001, // Cost per 1K tokens (estimated)
+      cost: 1000, // Cost per 1K tokens * 1000
       contextWindow: 8192,
       maxTokens: 8192,
     },
