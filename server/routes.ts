@@ -104,7 +104,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof ZodError) {
         res.status(400).json({ error: error.errors });
       } else {
-        res.status(500).json({ error: "Internal server error" });
+        console.error("Error creating model:", error);
+        res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+      }
+    }
+  });
+
+  app.patch("/api/admin/models/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    try {
+      const modelData = upsertModelSchema.parse(req.body);
+      const model = await storage.upsertModel(modelData);
+      res.json(model);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        console.error("Error updating model:", error);
+        res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
       }
     }
   });
