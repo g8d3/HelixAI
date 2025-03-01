@@ -73,8 +73,8 @@ export const upsertModelSchema = z.object({
   outputCost: z.number().min(0), // Cost per 1K output tokens
   enabled: z.boolean().optional(),
   isPublic: z.boolean().optional(),
-  contextWindow: z.number().int().optional(),
-  maxTokens: z.number().int().optional(),
+  contextWindow: z.number().int().nullish(), // Changed to nullish to accept null/undefined
+  maxTokens: z.number().int().nullish(), // Changed to nullish to accept null/undefined
 });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;

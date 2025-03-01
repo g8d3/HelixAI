@@ -354,6 +354,7 @@ export default function AdminPage() {
         </Card>
 
 
+
         <Card>
           <CardHeader>
             <CardTitle>Model Management</CardTitle>
@@ -457,8 +458,8 @@ export default function AdminPage() {
                         e.preventDefault();
                         const data = {
                           ...modelForm,
-                          contextWindow: modelForm.contextWindow || undefined,
-                          maxTokens: modelForm.maxTokens || undefined,
+                          contextWindow: modelForm.contextWindow || null,
+                          maxTokens: modelForm.maxTokens || null,
                         };
                         upsertModelMutation.mutate(data);
                       }}
