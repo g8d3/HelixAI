@@ -60,6 +60,11 @@ export default function HomePage() {
             <Link href="/dashboard">
               <Button variant="outline">Dashboard</Button>
             </Link>
+            {user?.isAdmin && (
+              <Link href="/admin">
+                <Button variant="outline">Admin</Button>
+              </Link>
+            )}
             <div className="text-sm">Credits: {user?.credits}</div>
             <Button
               variant="ghost"

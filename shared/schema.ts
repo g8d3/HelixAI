@@ -7,6 +7,7 @@ export const users = pgTable("users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   credits: integer("credits").notNull().default(100),
+  isAdmin: boolean("is_admin").notNull().default(false),
 });
 
 export const queries = pgTable("queries", {
@@ -30,7 +31,14 @@ export const querySchema = z.object({
   model: z.enum(["gpt-3.5-turbo", "gpt-4", "claude-2", "palm-2"]),
 });
 
+// Admin schemas
+export const updateUserSchema = z.object({
+  credits: z.number().int().min(0),
+  isAdmin: z.boolean().optional(),
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Query = typeof queries.$inferSelect;
 export type InsertQuery = typeof queries.$inferInsert;
+export type UpdateUser = z.infer<typeof updateUserSchema>;

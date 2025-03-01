@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { querySchema } from "@shared/schema";
+import { querySchema, updateUserSchema } from "@shared/schema";
 import { ZodError } from "zod";
 
 const MOCK_MODELS = {
@@ -19,16 +19,49 @@ function generateMockResponse(prompt: string, model: string): string {
   return `${model} response to: ${truncatedPrompt}`;
 }
 
+function isAdmin(req: Express.Request) {
+  return req.user?.isAdmin === true;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   setupAuth(app);
 
+  // Admin routes
+  app.get("/api/admin/users", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    const users = await storage.getAllUsers();
+    res.json(users);
+  });
+
+  app.patch("/api/admin/users/:id", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    try {
+      const updates = updateUserSchema.parse(req.body);
+      const user = await storage.updateUser(parseInt(req.params.id), updates);
+      res.json(user);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
+
+  app.get("/api/admin/queries", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    const queries = await storage.getAllQueries();
+    res.json(queries);
+  });
+
+  // Existing routes
   app.post("/api/query", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
       const { prompt, model } = querySchema.parse(req.body);
       const user = req.user!;
-      
+
       const modelConfig = MOCK_MODELS[model as keyof typeof MOCK_MODELS];
       if (user.credits < modelConfig.cost) {
         return res.status(402).json({ error: "Insufficient credits" });

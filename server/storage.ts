@@ -1,4 +1,4 @@
-import { users, queries, type User, type InsertUser, type Query, type InsertQuery } from "@shared/schema";
+import { users, queries, type User, type InsertUser, type Query, type InsertQuery, type UpdateUser } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import session from "express-session";
@@ -14,6 +14,10 @@ export interface IStorage {
   updateUserCredits(userId: number, credits: number): Promise<void>;
   createQuery(query: InsertQuery): Promise<Query>;
   getUserQueries(userId: number): Promise<Query[]>;
+  // Admin operations
+  getAllUsers(): Promise<User[]>;
+  getAllQueries(): Promise<Query[]>;
+  updateUser(userId: number, updates: UpdateUser): Promise<User>;
   sessionStore: session.Store;
 }
 
@@ -66,6 +70,24 @@ export class DatabaseStorage implements IStorage {
       .from(queries)
       .where(eq(queries.userId, userId))
       .orderBy(queries.timestamp);
+  }
+
+  // Admin operations
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+
+  async getAllQueries(): Promise<Query[]> {
+    return db.select().from(queries).orderBy(queries.timestamp);
+  }
+
+  async updateUser(userId: number, updates: UpdateUser): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set(updates)
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
   }
 }
 
