@@ -162,6 +162,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/models"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/models"] }); // Add this line
       toast({ title: "Model updated", description: "Model settings updated." });
     },
     onError: (error: Error) => {
@@ -182,6 +183,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/models"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/models"] }); // Add this line
       setModelDialogOpen(false);
       setModelForm(initialModelForm);
       toast({ title: "Model saved", description: "Model successfully saved." });
@@ -202,6 +204,7 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/models"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/models"] }); // Add this line
       toast({
         title: "Models synced",
         description: "Available models have been synced from providers.",

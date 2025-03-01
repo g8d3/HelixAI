@@ -16,18 +16,19 @@ import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
-//const MODELS = [  //Removed hardcoded models
-//  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", cost: 5 },
-//  { id: "gpt-4", name: "GPT-4", cost: 20 },
-//  { id: "claude-2", name: "Claude 2", cost: 15 },
-//  { id: "palm-2", name: "PaLM 2", cost: 10 },
-//];
+type Model = {
+  providerId: string;
+  displayName: string;
+  provider: string;
+  inputCost: number;
+  outputCost: number;
+};
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState(""); // Initialize model to empty string
+  const [model, setModel] = useState("");
   const [response, setResponse] = useState("");
 
   const { data: models, isLoading: modelsLoading } = useQuery({
@@ -43,7 +44,7 @@ export default function HomePage() {
       setResponse(data.response);
       toast({
         title: "Query processed",
-        description: `Cost: ${data.cost} credits. Remaining: ${data.remainingCredits}`,
+        description: `Total cost: ${(data.cost / 100000).toFixed(4)} credits`,
       });
     },
     onError: (error: Error) => {
@@ -69,7 +70,6 @@ export default function HomePage() {
                 <Button variant="outline">Admin</Button>
               </Link>
             )}
-            <div className="text-sm">Credits: {user?.credits}</div>
             <Button
               variant="ghost"
               onClick={() => logoutMutation.mutate()}
@@ -91,15 +91,15 @@ export default function HomePage() {
               <Select
                 value={model}
                 onValueChange={setModel}
-                disabled={modelsLoading} // Disable select while loading
+                disabled={modelsLoading}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a model" />
                 </SelectTrigger>
                 <SelectContent>
-                  {models?.map((m: any) => ( //Type assertion needed here.  Adjust as needed based on the actual data shape from /api/models
-                    <SelectItem key={m.id} value={m.id}>
-                      {m.name} ({m.cost} credits)
+                  {models?.map((m: Model) => (
+                    <SelectItem key={m.providerId} value={m.providerId}>
+                      {m.displayName} (${(m.inputCost / 100000).toFixed(4)}/1K input, ${(m.outputCost / 100000).toFixed(4)}/1K output)
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -117,7 +117,7 @@ export default function HomePage() {
 
             <Button
               onClick={() => queryMutation.mutate({ prompt, model })}
-              disabled={queryMutation.isPending || !prompt || !model || modelsLoading} //Disable button while loading or no model selected.
+              disabled={queryMutation.isPending || !prompt || !model || modelsLoading}
               className="w-full"
             >
               {queryMutation.isPending ? (
