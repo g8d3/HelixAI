@@ -55,23 +55,22 @@ type Model = {
 type ModelFormData = {
   providerId: string;
   displayName: string;
-  provider: string;
-  cost: number;
-  enabled: boolean;
-  contextWindow?: number;
-  maxTokens?: number;
-};
-
-type UpsertModel = {
-  providerId: string;
-  displayName: string;
   provider: "openai" | "anthropic" | "palm";
   cost: number;
   enabled: boolean;
-  contextWindow?: number;
-  maxTokens?: number;
+  contextWindow?: number | null;
+  maxTokens?: number | null;
 };
 
+const initialModelForm: ModelFormData = {
+  providerId: "",
+  displayName: "",
+  provider: "openai",
+  cost: 5,
+  enabled: true,
+  contextWindow: null,
+  maxTokens: null,
+};
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -88,7 +87,7 @@ export default function AdminPage() {
 
   const [modelDialogOpen, setModelDialogOpen] = useState(false); // Added state
   const [editingModel, setEditingModel] = useState<Model | null>(null); // Added state
-  const [modelForm, setModelForm] = useState<ModelFormData | null>(null); // Added state
+  const [modelForm, setModelForm] = useState<ModelFormData>(initialModelForm); // Added state
 
   const { data: users, isLoading: loadingUsers } = useQuery({
     queryKey: ["/api/admin/users"],
@@ -178,7 +177,7 @@ export default function AdminPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/models"] });
       setModelDialogOpen(false);
-      setModelForm(null);
+      setModelForm(initialModelForm);
       toast({ title: "Model saved", description: "Model successfully saved." });
     },
     onError: (error: Error) => {
@@ -190,6 +189,28 @@ export default function AdminPage() {
     },
   });
 
+  const syncModelsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/models/sync");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/models"] });
+      toast({
+        title: "Models synced",
+        description: "Available models have been synced from providers.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+
   useEffect(() => {
     if (editingModel) {
       setModelForm({
@@ -198,20 +219,13 @@ export default function AdminPage() {
         provider: editingModel.provider,
         cost: editingModel.cost,
         enabled: editingModel.enabled,
-        contextWindow: editingModel.contextWindow ?? undefined,
-        maxTokens: editingModel.maxTokens ?? undefined,
+        contextWindow: editingModel.contextWindow ?? null,
+        maxTokens: editingModel.maxTokens ?? null,
       });
     } else {
-      setModelForm({
-        providerId: "",
-        displayName: "",
-        provider: "openai",
-        cost: 5,
-        enabled: true,
-      });
+      setModelForm(initialModelForm);
     }
   }, [editingModel]);
-
 
   if (!user?.isAdmin) {
     return <Redirect to="/" />;
@@ -346,6 +360,25 @@ export default function AdminPage() {
               </div>
             ) : (
               <div className="space-y-4">
+                <div className="flex justify-end space-x-4">
+                  <Button
+                    onClick={() => syncModelsMutation.mutate()}
+                    disabled={syncModelsMutation.isPending}
+                  >
+                    {syncModelsMutation.isPending && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Sync Available Models
+                  </Button>
+                  <Button onClick={() => {
+                    setEditingModel(null);
+                    setModelForm(initialModelForm);
+                    setModelDialogOpen(true);
+                  }}>
+                    Add New Model
+                  </Button>
+                </div>
+
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -392,19 +425,6 @@ export default function AdminPage() {
                   </TableBody>
                 </Table>
 
-                <Button onClick={() => {
-                  setModelForm({
-                    providerId: "",
-                    displayName: "",
-                    provider: "openai", 
-                    cost: 5,
-                    enabled: true,
-                  });
-                  setModelDialogOpen(true);
-                }}>
-                  Add New Model
-                </Button>
-
                 <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
                   <DialogContent>
                     <DialogHeader>
@@ -415,26 +435,21 @@ export default function AdminPage() {
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
-                        if (!modelForm) return;
-
-                        upsertModelMutation.mutate({
-                          providerId: modelForm.providerId,
-                          displayName: modelForm.displayName,
-                          provider: modelForm.provider as "openai" | "anthropic" | "palm",
-                          cost: parseInt(modelForm.cost.toString()),
-                          enabled: modelForm.enabled,
-                          contextWindow: modelForm.contextWindow,
-                          maxTokens: modelForm.maxTokens,
-                        });
+                        const data = {
+                          ...modelForm,
+                          contextWindow: modelForm.contextWindow || undefined,
+                          maxTokens: modelForm.maxTokens || undefined,
+                        };
+                        upsertModelMutation.mutate(data);
                       }}
                       className="space-y-4"
                     >
                       <div className="space-y-2">
                         <Label>Provider</Label>
                         <Select
-                          value={modelForm?.provider}
-                          onValueChange={(value) =>
-                            setModelForm(prev => ({ ...prev, provider: value }))
+                          value={modelForm.provider}
+                          onValueChange={(value: "openai" | "anthropic" | "palm") =>
+                            setModelForm({ ...modelForm, provider: value })
                           }
                         >
                           <SelectTrigger>
@@ -451,9 +466,9 @@ export default function AdminPage() {
                       <div className="space-y-2">
                         <Label>Model ID</Label>
                         <Input
-                          value={modelForm?.providerId}
+                          value={modelForm.providerId}
                           onChange={(e) =>
-                            setModelForm(prev => ({ ...prev, providerId: e.target.value }))
+                            setModelForm({ ...modelForm, providerId: e.target.value })
                           }
                           placeholder="e.g., gpt-4"
                         />
@@ -462,9 +477,9 @@ export default function AdminPage() {
                       <div className="space-y-2">
                         <Label>Display Name</Label>
                         <Input
-                          value={modelForm?.displayName}
+                          value={modelForm.displayName}
                           onChange={(e) =>
-                            setModelForm(prev => ({ ...prev, displayName: e.target.value }))
+                            setModelForm({ ...modelForm, displayName: e.target.value })
                           }
                           placeholder="e.g., GPT-4"
                         />
@@ -475,9 +490,9 @@ export default function AdminPage() {
                         <Input
                           type="number"
                           min="1"
-                          value={modelForm?.cost}
+                          value={modelForm.cost}
                           onChange={(e) =>
-                            setModelForm(prev => ({ ...prev, cost: parseInt(e.target.value) }))
+                            setModelForm({ ...modelForm, cost: parseInt(e.target.value) })
                           }
                         />
                       </div>
@@ -486,10 +501,11 @@ export default function AdminPage() {
                         <Label>Context Window</Label>
                         <Input
                           type="number"
-                          value={modelForm?.contextWindow}
-                          onChange={(e) =>
-                            setModelForm(prev => ({ ...prev, contextWindow: parseInt(e.target.value) }))
-                          }
+                          value={modelForm.contextWindow ?? ""}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseInt(e.target.value) : null;
+                            setModelForm({ ...modelForm, contextWindow: value });
+                          }}
                           placeholder="Optional"
                         />
                       </div>
@@ -498,19 +514,20 @@ export default function AdminPage() {
                         <Label>Max Tokens</Label>
                         <Input
                           type="number"
-                          value={modelForm?.maxTokens}
-                          onChange={(e) =>
-                            setModelForm(prev => ({ ...prev, maxTokens: parseInt(e.target.value) }))
-                          }
+                          value={modelForm.maxTokens ?? ""}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseInt(e.target.value) : null;
+                            setModelForm({ ...modelForm, maxTokens: value });
+                          }}
                           placeholder="Optional"
                         />
                       </div>
 
                       <div className="flex items-center space-x-2">
                         <Switch
-                          checked={modelForm?.enabled}
+                          checked={modelForm.enabled}
                           onCheckedChange={(checked) =>
-                            setModelForm(prev => ({ ...prev, enabled: checked }))
+                            setModelForm({ ...modelForm, enabled: checked })
                           }
                         />
                         <Label>Enabled</Label>
@@ -524,7 +541,15 @@ export default function AdminPage() {
                         >
                           Cancel
                         </Button>
-                        <Button type="submit">
+                        <Button
+                          type="submit"
+                          disabled={
+                            !modelForm.providerId ||
+                            !modelForm.displayName ||
+                            !modelForm.provider ||
+                            modelForm.cost < 1
+                          }
+                        >
                           {editingModel ? 'Update' : 'Create'}
                         </Button>
                       </div>
@@ -582,7 +607,7 @@ export default function AdminPage() {
                       <TableCell>
                         {editingUser?.id === u.id ? (
                           <Switch
-                            checked={editingModel.enabled}
+                            checked={editingModel?.enabled ?? false} //Fixed potential error here
                             onCheckedChange={(checked) =>
                               setEditingUser({
                                 ...editingUser,

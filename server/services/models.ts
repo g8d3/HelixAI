@@ -29,6 +29,100 @@ async function getClient(provider: string) {
   }
 }
 
+async function fetchOpenAIModels() {
+  const client = await getClient("openai") as OpenAI;
+  const response = await client.models.list();
+
+  return response.data
+    .filter(model => model.id.includes('gpt'))
+    .map(model => ({
+      providerId: model.id,
+      displayName: model.id.split('-').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1)
+      ).join(' '),
+      provider: 'openai',
+      cost: model.id.includes('gpt-4') ? 20 : 5,
+      contextWindow: model.context_window,
+    }));
+}
+
+async function fetchAnthropicModels() {
+  // Anthropic doesn't have a models endpoint yet, return known models
+  return [
+    {
+      providerId: 'claude-2',
+      displayName: 'Claude 2',
+      provider: 'anthropic',
+      cost: 15,
+      contextWindow: 100000,
+    },
+    {
+      providerId: 'claude-instant-1',
+      displayName: 'Claude Instant',
+      provider: 'anthropic',
+      cost: 8,
+      contextWindow: 100000,
+    },
+  ];
+}
+
+async function fetchPaLMModels() {
+  // PaLM doesn't have a models endpoint yet, return known models
+  return [
+    {
+      providerId: 'gemini-pro',
+      displayName: 'Gemini Pro',
+      provider: 'palm',
+      cost: 10,
+      contextWindow: 8192,
+    },
+  ];
+}
+
+export async function syncAvailableModels() {
+  try {
+    const models = [];
+    const providers = ['openai', 'anthropic', 'palm'];
+
+    for (const provider of providers) {
+      try {
+        const apiKey = await storage.getApiKey(provider);
+        if (!apiKey) continue;
+
+        let providerModels;
+        switch (provider) {
+          case 'openai':
+            providerModels = await fetchOpenAIModels();
+            break;
+          case 'anthropic':
+            providerModels = await fetchAnthropicModels();
+            break;
+          case 'palm':
+            providerModels = await fetchPaLMModels();
+            break;
+        }
+        models.push(...providerModels);
+      } catch (error) {
+        console.error(`Error fetching models from ${provider}:`, error);
+      }
+    }
+
+    // Update models in database
+    for (const model of models) {
+      await storage.upsertModel({
+        ...model,
+        enabled: true,
+        maxTokens: model.contextWindow,
+      });
+    }
+
+    return models;
+  } catch (error) {
+    console.error('Error syncing models:', error);
+    throw error;
+  }
+}
+
 export async function generateResponse(
   prompt: string,
   model: string,

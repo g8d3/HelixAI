@@ -4,7 +4,7 @@ import { setupAuth } from "./auth";
 import { storage } from "./storage";
 import { querySchema, updateUserSchema, upsertApiKeySchema, upsertModelSchema } from "@shared/schema";
 import { ZodError } from "zod";
-import { generateResponse } from "./services/models";
+import { generateResponse, syncAvailableModels } from "./services/models";
 
 function isAdmin(req: Express.Request) {
   return req.user?.isAdmin === true;
@@ -53,6 +53,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const keyData = upsertApiKeySchema.parse(req.body);
       const key = await storage.upsertApiKey(keyData);
+
+      // After saving a new API key, sync models from that provider
+      try {
+        await syncAvailableModels();
+      } catch (error) {
+        console.error('Error syncing models after API key update:', error);
+        // Don't fail the request if sync fails
+      }
+
       res.json(key);
     } catch (error) {
       if (error instanceof ZodError) {
@@ -73,6 +82,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
     const models = await storage.getAllModels();
     res.json(models);
+  });
+
+  app.post("/api/admin/models/sync", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    try {
+      const models = await syncAvailableModels();
+      res.json(models);
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+    }
   });
 
   app.post("/api/admin/models", async (req, res) => {
