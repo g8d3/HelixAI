@@ -38,7 +38,8 @@ export const models = pgTable("models", {
   providerId: text("provider_id").notNull(), // e.g., "gpt-4" for OpenAI
   displayName: text("display_name").notNull(),
   provider: text("provider").notNull(), // openai, anthropic, palm
-  cost: integer("cost").notNull(), // Cost per 1K tokens in credits
+  inputCost: integer("input_cost").notNull(), // Cost per 1K input tokens in cents*1000
+  outputCost: integer("output_cost").notNull(), // Cost per 1K output tokens in cents*1000
   enabled: boolean("enabled").notNull().default(true),
   contextWindow: integer("context_window"),
   maxTokens: integer("max_tokens"),
@@ -70,7 +71,8 @@ export const upsertModelSchema = z.object({
   providerId: z.string().min(1),
   displayName: z.string().min(1),
   provider: z.enum(["openai", "anthropic", "palm"]),
-  cost: z.number().min(0), // Cost per 1K tokens
+  inputCost: z.number().min(0), // Cost per 1K input tokens
+  outputCost: z.number().min(0), // Cost per 1K output tokens
   enabled: z.boolean().optional(),
   contextWindow: z.number().int().optional(),
   maxTokens: z.number().int().optional(),

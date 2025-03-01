@@ -46,7 +46,8 @@ type Model = {
   providerId: string;
   displayName: string;
   provider: "openai" | "anthropic" | "palm";
-  cost: number;
+  inputCost: number;
+  outputCost: number;
   enabled: boolean;
   contextWindow?: number;
   maxTokens?: number;
@@ -56,7 +57,8 @@ type ModelFormData = {
   providerId: string;
   displayName: string;
   provider: "openai" | "anthropic" | "palm";
-  cost: number;
+  inputCost: number;
+  outputCost: number;
   enabled: boolean;
   contextWindow?: number | null;
   maxTokens?: number | null;
@@ -66,7 +68,8 @@ const initialModelForm: ModelFormData = {
   providerId: "",
   displayName: "",
   provider: "openai",
-  cost: 500000, // Updated initial cost to cents
+  inputCost: 150, // Default to GPT-3.5 pricing
+  outputCost: 200,
   enabled: true,
   contextWindow: null,
   maxTokens: null,
@@ -217,7 +220,8 @@ export default function AdminPage() {
         providerId: editingModel.providerId,
         displayName: editingModel.displayName,
         provider: editingModel.provider,
-        cost: editingModel.cost,
+        inputCost: editingModel.inputCost,
+        outputCost: editingModel.outputCost,
         enabled: editingModel.enabled,
         contextWindow: editingModel.contextWindow ?? null,
         maxTokens: editingModel.maxTokens ?? null,
@@ -396,7 +400,10 @@ export default function AdminPage() {
                         <TableCell>{model.providerId}</TableCell>
                         <TableCell>{model.displayName}</TableCell>
                         <TableCell>{model.provider}</TableCell>
-                        <TableCell>${(model.cost / 100000).toFixed(3)}/1K tokens</TableCell>
+                        <TableCell>
+                          Input: ${(model.inputCost / 100000).toFixed(4)}/1K tokens<br/>
+                          Output: ${(model.outputCost / 100000).toFixed(4)}/1K tokens
+                        </TableCell>
                         <TableCell>
                           <Switch
                             checked={model.enabled}
@@ -486,14 +493,27 @@ export default function AdminPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Cost per 1K tokens ($)</Label>
+                        <Label>Input Cost per 1K tokens ($)</Label>
                         <Input
                           type="number"
-                          min="0.001"
-                          step="0.001"
-                          value={(modelForm.cost / 100000).toFixed(3)}
+                          min="0.0001"
+                          step="0.0001"
+                          value={(modelForm.inputCost / 100000).toFixed(4)}
                           onChange={(e) =>
-                            setModelForm({ ...modelForm, cost: Math.round(parseFloat(e.target.value) * 100000) })
+                            setModelForm({ ...modelForm, inputCost: Math.round(parseFloat(e.target.value) * 100000) })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Output Cost per 1K tokens ($)</Label>
+                        <Input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          value={(modelForm.outputCost / 100000).toFixed(4)}
+                          onChange={(e) =>
+                            setModelForm({ ...modelForm, outputCost: Math.round(parseFloat(e.target.value) * 100000) })
                           }
                         />
                       </div>
@@ -548,7 +568,8 @@ export default function AdminPage() {
                             !modelForm.providerId ||
                             !modelForm.displayName ||
                             !modelForm.provider ||
-                            modelForm.cost < 1000
+                            modelForm.inputCost < 1000 ||
+                            modelForm.outputCost < 1000
                           }
                         >
                           {editingModel ? 'Update' : 'Create'}
@@ -689,7 +710,8 @@ type UpsertModel = {
   providerId: string;
   displayName: string;
   provider: "openai" | "anthropic" | "palm";
-  cost: number;
+  inputCost: number;
+  outputCost: number;
   enabled: boolean;
   contextWindow?: number;
   maxTokens?: number;

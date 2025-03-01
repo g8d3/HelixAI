@@ -35,8 +35,10 @@ async function fetchOpenAIModels() {
       ).join(' '),
       provider: 'openai' as const,
       // Convert USD/1K tokens to integer (multiply by 100000)
-      // GPT-4: $0.03/1K tokens, GPT-3.5: $0.002/1K tokens
-      cost: model.id.includes('gpt-4') ? 3000 : 200,
+      // GPT-4: Input $0.03, Output $0.06 per 1K tokens
+      // GPT-3.5: Input $0.0015, Output $0.002 per 1K tokens
+      inputCost: model.id.includes('gpt-4') ? 3000 : 150,
+      outputCost: model.id.includes('gpt-4') ? 6000 : 200,
       contextWindow: model.context_window,
       maxTokens: model.context_window,
     }));
@@ -49,7 +51,8 @@ async function fetchAnthropicModels() {
       providerId: 'claude-2',
       displayName: 'Claude 2',
       provider: 'anthropic' as const,
-      cost: 1100, // $0.011/1K tokens
+      inputCost: 1100, // $0.011/1K input tokens
+      outputCost: 3200, // $0.032/1K output tokens
       contextWindow: 100000,
       maxTokens: 100000,
     },
@@ -57,7 +60,8 @@ async function fetchAnthropicModels() {
       providerId: 'claude-instant-1',
       displayName: 'Claude Instant',
       provider: 'anthropic' as const,
-      cost: 163, // $0.00163/1K tokens
+      inputCost: 163,  // $0.00163/1K input tokens
+      outputCost: 550, // $0.0055/1K output tokens
       contextWindow: 100000,
       maxTokens: 100000,
     },
@@ -71,7 +75,8 @@ async function fetchPaLMModels() {
       providerId: 'gemini-pro',
       displayName: 'Gemini Pro',
       provider: 'palm' as const,
-      cost: 100, // $0.001/1K tokens
+      inputCost: 100,  // $0.001/1K input tokens
+      outputCost: 200, // $0.002/1K output tokens
       contextWindow: 8192,
       maxTokens: 8192,
     },
