@@ -1,4 +1,5 @@
 import { useAuth } from "@/hooks/use-auth";
+import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Redirect } from "wouter";
 import {
@@ -134,8 +135,13 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Admin Dashboard</h1>
+          <div className="flex items-center gap-4">
+            <Link href="/">
+              <Button variant="outline">Home</Button>
+            </Link>
+          </div>
         </div>
       </header>
 
