@@ -2,9 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { querySchema, updateUserSchema, upsertApiKeySchema } from "@shared/schema";
+import { querySchema, updateUserSchema, upsertApiKeySchema, upsertModelSchema } from "@shared/schema";
 import { ZodError } from "zod";
-import { generateResponse, MODEL_CONFIGS } from "./services/models";
+import { generateResponse } from "./services/models";
 
 function isAdmin(req: Express.Request) {
   return req.user?.isAdmin === true;
@@ -63,42 +63,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Model management
+  app.get("/api/models", async (req, res) => {
+    const models = await storage.getEnabledModels();
+    res.json(models);
+  });
+
+  app.get("/api/admin/models", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    const models = await storage.getAllModels();
+    res.json(models);
+  });
+
+  app.post("/api/admin/models", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    try {
+      const modelData = upsertModelSchema.parse(req.body);
+      const model = await storage.upsertModel(modelData);
+      res.json(model);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
+
   // Query route
   app.post("/api/query", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
     try {
-      const { prompt, model } = querySchema.parse(req.body);
+      const { prompt, model: modelId } = querySchema.parse(req.body);
       const user = req.user!;
 
-      const modelConfig = MODEL_CONFIGS[model];
-      if (!modelConfig) {
-        return res.status(400).json({ error: "Invalid model selected" });
+      const model = await storage.getModel(modelId);
+      if (!model || !model.enabled) {
+        return res.status(400).json({ error: "Invalid or disabled model selected" });
       }
 
-      if (user.credits < modelConfig.cost) {
+      if (user.credits < model.cost) {
         return res.status(402).json({ error: "Insufficient credits" });
       }
 
-      const { response, tokens } = await generateResponse(prompt, model);
+      const { response, tokens } = await generateResponse(prompt, modelId);
 
       const query = await storage.createQuery({
         userId: user.id,
         prompt,
-        model,
+        model: modelId,
         response,
         tokens,
-        cost: modelConfig.cost,
+        cost: model.cost,
         timestamp: new Date(),
       });
 
-      await storage.updateUserCredits(user.id, user.credits - modelConfig.cost);
+      await storage.updateUserCredits(user.id, user.credits - model.cost);
 
       res.json({
         response,
         tokens,
-        cost: modelConfig.cost,
-        remainingCredits: user.credits - modelConfig.cost,
+        cost: model.cost,
+        remainingCredits: user.credits - model.cost,
       });
     } catch (error) {
       if (error instanceof ZodError) {

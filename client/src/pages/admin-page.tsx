@@ -36,9 +36,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Label } from "@/components/ui/label"; // Added import
+
+type Model = {
+  id: number;
+  providerId: string;
+  displayName: string;
+  provider: "openai" | "anthropic" | "palm";
+  cost: number;
+  enabled: boolean;
+  contextWindow?: number;
+  maxTokens?: number;
+};
+
+type ModelFormData = {
+  providerId: string;
+  displayName: string;
+  provider: string;
+  cost: number;
+  enabled: boolean;
+  contextWindow?: number;
+  maxTokens?: number;
+};
+
+type UpsertModel = {
+  providerId: string;
+  displayName: string;
+  provider: "openai" | "anthropic" | "palm";
+  cost: number;
+  enabled: boolean;
+  contextWindow?: number;
+  maxTokens?: number;
+};
+
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -53,6 +86,10 @@ export default function AdminPage() {
     apiKey: "",
   });
 
+  const [modelDialogOpen, setModelDialogOpen] = useState(false); // Added state
+  const [editingModel, setEditingModel] = useState<Model | null>(null); // Added state
+  const [modelForm, setModelForm] = useState<ModelFormData | null>(null); // Added state
+
   const { data: users, isLoading: loadingUsers } = useQuery({
     queryKey: ["/api/admin/users"],
   });
@@ -63,6 +100,10 @@ export default function AdminPage() {
 
   const { data: apiKeys, isLoading: loadingApiKeys } = useQuery({
     queryKey: ["/api/admin/api-keys"],
+  });
+
+  const { data: models, isLoading: loadingModels } = useQuery({ // Added query
+    queryKey: ["/api/admin/models"],
   });
 
   const updateUserMutation = useMutation({
@@ -108,6 +149,69 @@ export default function AdminPage() {
       });
     },
   });
+
+  const updateModelMutation = useMutation({ // Added mutation
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("PATCH", `/api/admin/models/${data.id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/models"] });
+      toast({ title: "Model updated", description: "Model settings updated." });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const upsertModelMutation = useMutation({ // Added mutation
+    mutationFn: async (data: UpsertModel) => {
+      const method = editingModel ? "PATCH" : "POST";
+      const url = editingModel ? `/api/admin/models/${editingModel.id}` : "/api/admin/models";
+      const res = await apiRequest(method, url, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/models"] });
+      setModelDialogOpen(false);
+      setModelForm(null);
+      toast({ title: "Model saved", description: "Model successfully saved." });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  useEffect(() => {
+    if (editingModel) {
+      setModelForm({
+        providerId: editingModel.providerId,
+        displayName: editingModel.displayName,
+        provider: editingModel.provider,
+        cost: editingModel.cost,
+        enabled: editingModel.enabled,
+        contextWindow: editingModel.contextWindow ?? undefined,
+        maxTokens: editingModel.maxTokens ?? undefined,
+      });
+    } else {
+      setModelForm({
+        providerId: "",
+        displayName: "",
+        provider: "openai",
+        cost: 5,
+        enabled: true,
+      });
+    }
+  }, [editingModel]);
+
 
   if (!user?.isAdmin) {
     return <Redirect to="/" />;
@@ -228,6 +332,210 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
+
+        {/* Added Model Management Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Model Management</CardTitle>
+            <CardDescription>Configure and manage available AI models</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingModels ? (
+              <div className="flex justify-center p-4">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Model ID</TableHead>
+                      <TableHead>Display Name</TableHead>
+                      <TableHead>Provider</TableHead>
+                      <TableHead>Cost</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {models?.map((model: Model) => (
+                      <TableRow key={model.id}>
+                        <TableCell>{model.providerId}</TableCell>
+                        <TableCell>{model.displayName}</TableCell>
+                        <TableCell>{model.provider}</TableCell>
+                        <TableCell>{model.cost} credits</TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={model.enabled}
+                            onCheckedChange={(enabled) =>
+                              updateModelMutation.mutate({
+                                ...model,
+                                enabled,
+                              })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingModel(model);
+                              setModelDialogOpen(true);
+                            }}
+                          >
+                            Edit
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+
+                <Button onClick={() => {
+                  setModelForm({
+                    providerId: "",
+                    displayName: "",
+                    provider: "openai", 
+                    cost: 5,
+                    enabled: true,
+                  });
+                  setModelDialogOpen(true);
+                }}>
+                  Add New Model
+                </Button>
+
+                <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingModel ? 'Edit Model' : 'Add New Model'}
+                      </DialogTitle>
+                    </DialogHeader>
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        if (!modelForm) return;
+
+                        upsertModelMutation.mutate({
+                          providerId: modelForm.providerId,
+                          displayName: modelForm.displayName,
+                          provider: modelForm.provider as "openai" | "anthropic" | "palm",
+                          cost: parseInt(modelForm.cost.toString()),
+                          enabled: modelForm.enabled,
+                          contextWindow: modelForm.contextWindow,
+                          maxTokens: modelForm.maxTokens,
+                        });
+                      }}
+                      className="space-y-4"
+                    >
+                      <div className="space-y-2">
+                        <Label>Provider</Label>
+                        <Select
+                          value={modelForm?.provider}
+                          onValueChange={(value) =>
+                            setModelForm(prev => ({ ...prev, provider: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select provider" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="openai">OpenAI</SelectItem>
+                            <SelectItem value="anthropic">Anthropic</SelectItem>
+                            <SelectItem value="palm">Google PaLM</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Model ID</Label>
+                        <Input
+                          value={modelForm?.providerId}
+                          onChange={(e) =>
+                            setModelForm(prev => ({ ...prev, providerId: e.target.value }))
+                          }
+                          placeholder="e.g., gpt-4"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Display Name</Label>
+                        <Input
+                          value={modelForm?.displayName}
+                          onChange={(e) =>
+                            setModelForm(prev => ({ ...prev, displayName: e.target.value }))
+                          }
+                          placeholder="e.g., GPT-4"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Cost (credits)</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          value={modelForm?.cost}
+                          onChange={(e) =>
+                            setModelForm(prev => ({ ...prev, cost: parseInt(e.target.value) }))
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Context Window</Label>
+                        <Input
+                          type="number"
+                          value={modelForm?.contextWindow}
+                          onChange={(e) =>
+                            setModelForm(prev => ({ ...prev, contextWindow: parseInt(e.target.value) }))
+                          }
+                          placeholder="Optional"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Max Tokens</Label>
+                        <Input
+                          type="number"
+                          value={modelForm?.maxTokens}
+                          onChange={(e) =>
+                            setModelForm(prev => ({ ...prev, maxTokens: parseInt(e.target.value) }))
+                          }
+                          placeholder="Optional"
+                        />
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={modelForm?.enabled}
+                          onCheckedChange={(checked) =>
+                            setModelForm(prev => ({ ...prev, enabled: checked }))
+                          }
+                        />
+                        <Label>Enabled</Label>
+                      </div>
+
+                      <div className="flex justify-end space-x-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setModelDialogOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button type="submit">
+                          {editingModel ? 'Update' : 'Create'}
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>User Management</CardTitle>
@@ -274,7 +582,7 @@ export default function AdminPage() {
                       <TableCell>
                         {editingUser?.id === u.id ? (
                           <Switch
-                            checked={editingUser.isAdmin}
+                            checked={editingModel.enabled}
                             onCheckedChange={(checked) =>
                               setEditingUser({
                                 ...editingUser,

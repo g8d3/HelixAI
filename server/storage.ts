@@ -1,4 +1,4 @@
-import { users, queries, apiKeys, type User, type InsertUser, type Query, type InsertQuery, type UpdateUser, type ApiKey, type UpsertApiKey } from "@shared/schema";
+import { users, queries, apiKeys, models, type User, type InsertUser, type Query, type InsertQuery, type UpdateUser, type ApiKey, type UpsertApiKey, type Model, type UpsertModel } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import session from "express-session";
@@ -22,6 +22,11 @@ export interface IStorage {
   getApiKey(provider: string): Promise<string | null>;
   upsertApiKey(key: UpsertApiKey): Promise<ApiKey>;
   getAllApiKeys(): Promise<ApiKey[]>;
+  // Model operations
+  getAllModels(): Promise<Model[]>;
+  getEnabledModels(): Promise<Model[]>;
+  getModel(providerId: string): Promise<Model | undefined>;
+  upsertModel(model: UpsertModel): Promise<Model>;
   sessionStore: session.Store;
 }
 
@@ -127,6 +132,49 @@ export class DatabaseStorage implements IStorage {
 
   async getAllApiKeys(): Promise<ApiKey[]> {
     return db.select().from(apiKeys);
+  }
+
+  // Model operations
+  async getAllModels(): Promise<Model[]> {
+    return db.select().from(models).orderBy(models.provider, models.displayName);
+  }
+
+  async getEnabledModels(): Promise<Model[]> {
+    return db
+      .select()
+      .from(models)
+      .where(eq(models.enabled, true))
+      .orderBy(models.provider, models.displayName);
+  }
+
+  async getModel(providerId: string): Promise<Model | undefined> {
+    const [model] = await db
+      .select()
+      .from(models)
+      .where(eq(models.providerId, providerId));
+    return model;
+  }
+
+  async upsertModel(model: UpsertModel): Promise<Model> {
+    const [existing] = await db
+      .select()
+      .from(models)
+      .where(eq(models.providerId, model.providerId));
+
+    if (existing) {
+      const [updated] = await db
+        .update(models)
+        .set({ ...model, updatedAt: new Date() })
+        .where(eq(models.providerId, model.providerId))
+        .returning();
+      return updated;
+    }
+
+    const [newModel] = await db
+      .insert(models)
+      .values({ ...model, updatedAt: new Date() })
+      .returning();
+    return newModel;
   }
 }
 

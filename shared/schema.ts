@@ -33,6 +33,18 @@ export const apiKeys = pgTable("api_keys", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
+export const models = pgTable("models", {
+  id: serial("id").primaryKey(),
+  providerId: text("provider_id").notNull(), // e.g., "gpt-4" for OpenAI
+  displayName: text("display_name").notNull(),
+  provider: text("provider").notNull(), // openai, anthropic, palm
+  cost: integer("cost").notNull(),
+  enabled: boolean("enabled").notNull().default(true),
+  contextWindow: integer("context_window"),
+  maxTokens: integer("max_tokens"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -40,7 +52,7 @@ export const insertUserSchema = createInsertSchema(users).pick({
 
 export const querySchema = z.object({
   prompt: z.string().min(1).max(1000),
-  model: z.enum(["gpt-3.5-turbo", "gpt-4", "claude-2", "palm-2"]),
+  model: z.string().min(1), // Now accepts any model ID from the models table
 });
 
 // Admin schemas
@@ -54,6 +66,16 @@ export const upsertApiKeySchema = z.object({
   apiKey: z.string().min(1),
 });
 
+export const upsertModelSchema = z.object({
+  providerId: z.string().min(1),
+  displayName: z.string().min(1),
+  provider: z.enum(["openai", "anthropic", "palm"]),
+  cost: z.number().int().min(1),
+  enabled: z.boolean().optional(),
+  contextWindow: z.number().int().optional(),
+  maxTokens: z.number().int().optional(),
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Query = typeof queries.$inferSelect;
@@ -61,3 +83,5 @@ export type InsertQuery = typeof queries.$inferInsert;
 export type UpdateUser = z.infer<typeof updateUserSchema>;
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type UpsertApiKey = z.infer<typeof upsertApiKeySchema>;
+export type Model = typeof models.$inferSelect;
+export type UpsertModel = z.infer<typeof upsertModelSchema>;
