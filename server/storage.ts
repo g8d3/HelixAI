@@ -1,4 +1,4 @@
-import { users, queries, type User, type InsertUser, type Query, type InsertQuery, type UpdateUser } from "@shared/schema";
+import { users, queries, apiKeys, type User, type InsertUser, type Query, type InsertQuery, type UpdateUser, type ApiKey, type UpsertApiKey } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 import session from "express-session";
@@ -18,6 +18,10 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   getAllQueries(): Promise<Query[]>;
   updateUser(userId: number, updates: UpdateUser): Promise<User>;
+  // API Key operations
+  getApiKey(provider: string): Promise<string | null>;
+  upsertApiKey(key: UpsertApiKey): Promise<ApiKey>;
+  getAllApiKeys(): Promise<ApiKey[]>;
   sessionStore: session.Store;
 }
 
@@ -88,6 +92,41 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId))
       .returning();
     return user;
+  }
+
+  // API Key operations
+  async getApiKey(provider: string): Promise<string | null> {
+    const [key] = await db
+      .select()
+      .from(apiKeys)
+      .where(eq(apiKeys.provider, provider));
+    return key?.apiKey ?? null;
+  }
+
+  async upsertApiKey(key: UpsertApiKey): Promise<ApiKey> {
+    const [existing] = await db
+      .select()
+      .from(apiKeys)
+      .where(eq(apiKeys.provider, key.provider));
+
+    if (existing) {
+      const [updated] = await db
+        .update(apiKeys)
+        .set({ apiKey: key.apiKey, updatedAt: new Date() })
+        .where(eq(apiKeys.provider, key.provider))
+        .returning();
+      return updated;
+    }
+
+    const [newKey] = await db
+      .insert(apiKeys)
+      .values({ ...key, updatedAt: new Date() })
+      .returning();
+    return newKey;
+  }
+
+  async getAllApiKeys(): Promise<ApiKey[]> {
+    return db.select().from(apiKeys);
   }
 }
 

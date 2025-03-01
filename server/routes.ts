@@ -2,11 +2,9 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { querySchema, updateUserSchema } from "@shared/schema";
+import { querySchema, updateUserSchema, upsertApiKeySchema } from "@shared/schema";
 import { ZodError } from "zod";
 import { generateResponse, MODEL_CONFIGS } from "./services/models";
-
-// Removed MOCK_MODELS and generateMockResponse
 
 function isAdmin(req: Express.Request) {
   return req.user?.isAdmin === true;
@@ -43,7 +41,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(queries);
   });
 
-  // Existing routes
+  // API Key management
+  app.get("/api/admin/api-keys", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    const keys = await storage.getAllApiKeys();
+    res.json(keys);
+  });
+
+  app.post("/api/admin/api-keys", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    try {
+      const keyData = upsertApiKeySchema.parse(req.body);
+      const key = await storage.upsertApiKey(keyData);
+      res.json(key);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  });
+
+  // Query route
   app.post("/api/query", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
 
