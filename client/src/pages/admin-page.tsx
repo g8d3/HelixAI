@@ -39,7 +39,7 @@ import {
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Label } from "@/components/ui/label"; // Added import
+import { Label } from "@/components/ui/label";
 
 type Model = {
   id: number;
@@ -51,6 +51,7 @@ type Model = {
   enabled: boolean;
   contextWindow?: number;
   maxTokens?: number;
+  isPublic: boolean; // Added isPublic field
 };
 
 type ModelFormData = {
@@ -62,17 +63,19 @@ type ModelFormData = {
   enabled: boolean;
   contextWindow?: number | null;
   maxTokens?: number | null;
+  isPublic: boolean; // Added isPublic field
 };
 
 const initialModelForm: ModelFormData = {
   providerId: "",
   displayName: "",
   provider: "openai",
-  inputCost: 150, // Default to GPT-3.5 pricing
+  inputCost: 150,
   outputCost: 200,
   enabled: true,
   contextWindow: null,
   maxTokens: null,
+  isPublic: false, // Added default value for isPublic
 };
 
 export default function AdminPage() {
@@ -88,9 +91,9 @@ export default function AdminPage() {
     apiKey: "",
   });
 
-  const [modelDialogOpen, setModelDialogOpen] = useState(false); // Added state
-  const [editingModel, setEditingModel] = useState<Model | null>(null); // Added state
-  const [modelForm, setModelForm] = useState<ModelFormData>(initialModelForm); // Added state
+  const [modelDialogOpen, setModelDialogOpen] = useState(false);
+  const [editingModel, setEditingModel] = useState<Model | null>(null);
+  const [modelForm, setModelForm] = useState<ModelFormData>(initialModelForm);
 
   const { data: users, isLoading: loadingUsers } = useQuery({
     queryKey: ["/api/admin/users"],
@@ -104,7 +107,7 @@ export default function AdminPage() {
     queryKey: ["/api/admin/api-keys"],
   });
 
-  const { data: models, isLoading: loadingModels } = useQuery({ // Added query
+  const { data: models, isLoading: loadingModels } = useQuery({
     queryKey: ["/api/admin/models"],
   });
 
@@ -152,7 +155,7 @@ export default function AdminPage() {
     },
   });
 
-  const updateModelMutation = useMutation({ // Added mutation
+  const updateModelMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("PATCH", `/api/admin/models/${data.id}`, data);
       return res.json();
@@ -170,7 +173,7 @@ export default function AdminPage() {
     },
   });
 
-  const upsertModelMutation = useMutation({ // Added mutation
+  const upsertModelMutation = useMutation({
     mutationFn: async (data: UpsertModel) => {
       const method = editingModel ? "PATCH" : "POST";
       const url = editingModel ? `/api/admin/models/${editingModel.id}` : "/api/admin/models";
@@ -213,7 +216,6 @@ export default function AdminPage() {
     },
   });
 
-
   useEffect(() => {
     if (editingModel) {
       setModelForm({
@@ -225,6 +227,7 @@ export default function AdminPage() {
         enabled: editingModel.enabled,
         contextWindow: editingModel.contextWindow ?? null,
         maxTokens: editingModel.maxTokens ?? null,
+        isPublic: editingModel.isPublic, // Added isPublic
       });
     } else {
       setModelForm(initialModelForm);
@@ -351,7 +354,6 @@ export default function AdminPage() {
         </Card>
 
 
-        {/* Added Model Management Card */}
         <Card>
           <CardHeader>
             <CardTitle>Model Management</CardTitle>
@@ -389,8 +391,10 @@ export default function AdminPage() {
                       <TableHead>Model ID</TableHead>
                       <TableHead>Display Name</TableHead>
                       <TableHead>Provider</TableHead>
-                      <TableHead>Cost</TableHead>
+                      <TableHead>Input Cost</TableHead>
+                      <TableHead>Output Cost</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Public</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -400,10 +404,8 @@ export default function AdminPage() {
                         <TableCell>{model.providerId}</TableCell>
                         <TableCell>{model.displayName}</TableCell>
                         <TableCell>{model.provider}</TableCell>
-                        <TableCell>
-                          Input: ${(model.inputCost / 100000).toFixed(4)}/1K tokens<br/>
-                          Output: ${(model.outputCost / 100000).toFixed(4)}/1K tokens
-                        </TableCell>
+                        <TableCell>${(model.inputCost / 100000).toFixed(4)}/1K tokens</TableCell>
+                        <TableCell>${(model.outputCost / 100000).toFixed(4)}/1K tokens</TableCell>
                         <TableCell>
                           <Switch
                             checked={model.enabled}
@@ -411,6 +413,17 @@ export default function AdminPage() {
                               updateModelMutation.mutate({
                                 ...model,
                                 enabled,
+                              })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={model.isPublic}
+                            onCheckedChange={(isPublic) =>
+                              updateModelMutation.mutate({
+                                ...model,
+                                isPublic,
                               })
                             }
                           />
@@ -552,6 +565,15 @@ export default function AdminPage() {
                           }
                         />
                         <Label>Enabled</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={modelForm.isPublic}
+                          onCheckedChange={(checked) =>
+                            setModelForm({ ...modelForm, isPublic: checked })
+                          }
+                        />
+                        <Label>Show on Home Page</Label>
                       </div>
 
                       <div className="flex justify-end space-x-2">
@@ -715,4 +737,5 @@ type UpsertModel = {
   enabled: boolean;
   contextWindow?: number;
   maxTokens?: number;
+  isPublic: boolean; // Added isPublic field
 };

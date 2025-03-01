@@ -74,7 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Model management
   app.get("/api/models", async (req, res) => {
-    const models = await storage.getEnabledModels();
+    const models = await storage.getPublicModels();
     res.json(models);
   });
 

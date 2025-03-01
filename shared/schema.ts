@@ -2,11 +2,6 @@ import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export interface ModelConfig {
-  cost: number;
-  provider: "openai" | "anthropic" | "palm";
-}
-
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
@@ -21,8 +16,10 @@ export const queries = pgTable("queries", {
   prompt: text("prompt").notNull(),
   model: text("model").notNull(),
   response: text("response").notNull(),
-  tokens: integer("tokens").notNull(),
-  cost: integer("cost").notNull(), // Cost in credits (tokens * model.cost)
+  inputTokens: integer("input_tokens").notNull(),
+  outputTokens: integer("output_tokens").notNull(),
+  inputCost: integer("input_cost").notNull(), // Cost in cents*1000
+  outputCost: integer("output_cost").notNull(), // Cost in cents*1000
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 });
 
@@ -41,6 +38,7 @@ export const models = pgTable("models", {
   inputCost: integer("input_cost").notNull(), // Cost per 1K input tokens in cents*1000
   outputCost: integer("output_cost").notNull(), // Cost per 1K output tokens in cents*1000
   enabled: boolean("enabled").notNull().default(true),
+  isPublic: boolean("is_public").notNull().default(false), // Controls visibility on home page
   contextWindow: integer("context_window"),
   maxTokens: integer("max_tokens"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -74,6 +72,7 @@ export const upsertModelSchema = z.object({
   inputCost: z.number().min(0), // Cost per 1K input tokens
   outputCost: z.number().min(0), // Cost per 1K output tokens
   enabled: z.boolean().optional(),
+  isPublic: z.boolean().optional(),
   contextWindow: z.number().int().optional(),
   maxTokens: z.number().int().optional(),
 });

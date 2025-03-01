@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,19 +16,23 @@ import { apiRequest } from "@/lib/queryClient";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 
-const MODELS = [
-  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", cost: 5 },
-  { id: "gpt-4", name: "GPT-4", cost: 20 },
-  { id: "claude-2", name: "Claude 2", cost: 15 },
-  { id: "palm-2", name: "PaLM 2", cost: 10 },
-];
+//const MODELS = [  //Removed hardcoded models
+//  { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", cost: 5 },
+//  { id: "gpt-4", name: "GPT-4", cost: 20 },
+//  { id: "claude-2", name: "Claude 2", cost: 15 },
+//  { id: "palm-2", name: "PaLM 2", cost: 10 },
+//];
 
 export default function HomePage() {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState(MODELS[0].id);
+  const [model, setModel] = useState(""); // Initialize model to empty string
   const [response, setResponse] = useState("");
+
+  const { data: models, isLoading: modelsLoading } = useQuery({
+    queryKey: ["/api/models"],
+  });
 
   const queryMutation = useMutation({
     mutationFn: async (data: { prompt: string; model: string }) => {
@@ -87,12 +91,13 @@ export default function HomePage() {
               <Select
                 value={model}
                 onValueChange={setModel}
+                disabled={modelsLoading} // Disable select while loading
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select a model" />
                 </SelectTrigger>
                 <SelectContent>
-                  {MODELS.map((m) => (
+                  {models?.map((m: any) => ( //Type assertion needed here.  Adjust as needed based on the actual data shape from /api/models
                     <SelectItem key={m.id} value={m.id}>
                       {m.name} ({m.cost} credits)
                     </SelectItem>
@@ -112,7 +117,7 @@ export default function HomePage() {
 
             <Button
               onClick={() => queryMutation.mutate({ prompt, model })}
-              disabled={queryMutation.isPending || !prompt}
+              disabled={queryMutation.isPending || !prompt || !model || modelsLoading} //Disable button while loading or no model selected.
               className="w-full"
             >
               {queryMutation.isPending ? (

@@ -1,6 +1,6 @@
 import { users, queries, apiKeys, models, type User, type InsertUser, type Query, type InsertQuery, type UpdateUser, type ApiKey, type UpsertApiKey, type Model, type UpsertModel } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -28,6 +28,7 @@ export interface IStorage {
   getModel(providerId: string): Promise<Model | undefined>;
   upsertModel(model: UpsertModel): Promise<Model>;
   sessionStore: session.Store;
+  getPublicModels(): Promise<Model[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -175,6 +176,16 @@ export class DatabaseStorage implements IStorage {
       .values({ ...model, updatedAt: new Date() })
       .returning();
     return newModel;
+  }
+  async getPublicModels(): Promise<Model[]> {
+    return db
+      .select()
+      .from(models)
+      .where(and(
+        eq(models.enabled, true),
+        eq(models.isPublic, true)
+      ))
+      .orderBy(models.provider, models.displayName);
   }
 }
 
