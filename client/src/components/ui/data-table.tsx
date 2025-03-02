@@ -69,13 +69,19 @@ export function DataTable<TData, TValue>({
     <div className="space-y-4">
       <div className="rounded-md border">
         <div className="relative">
-          <div className="max-h-[600px] overflow-auto">
+          {/* Table container with fixed height and scrolling */}
+          <div className="h-[600px] overflow-auto">
             <Table>
-              <TableHeader className="sticky top-0 bg-background z-10">
+              {/* Fixed header */}
+              <TableHeader className="sticky top-0">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => (
-                      <TableHead key={header.id}>
+                      <TableHead
+                        key={header.id}
+                        // Add styles for sticky header
+                        className="bg-background sticky top-0"
+                      >
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <div
@@ -177,6 +183,7 @@ export function DataTable<TData, TValue>({
                   </TableRow>
                 ))}
               </TableHeader>
+              {/* Scrollable body */}
               <TableBody>
                 {table.getRowModel().rows?.length ? (
                   table.getRowModel().rows.map((row) => (
