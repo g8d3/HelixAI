@@ -1,6 +1,6 @@
-import { users, queries, apiKeys, models, type User, type InsertUser, type Query, type InsertQuery, type UpdateUser, type ApiKey, type UpsertApiKey, type Model, type UpsertModel } from "@shared/schema";
+import { users, queries, apiKeys, models, paymentCredentials, paymentMethods, transactions, type User, type InsertUser, type Query, type InsertQuery, type UpdateUser, type ApiKey, type UpsertApiKey, type Model, type UpsertModel, type PaymentCredentials, type UpsertPaymentCredentials, type PaymentMethod, type UpsertPaymentMethod, type Transaction } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import session from "express-session";
 import connectPg from "connect-pg-simple";
 import { pool } from "./db";
@@ -29,6 +29,12 @@ export interface IStorage {
   upsertModel(model: UpsertModel): Promise<Model>;
   sessionStore: session.Store;
   getPublicModels(): Promise<Model[]>;
+  // Payment operations
+  getAllPaymentCredentials(): Promise<PaymentCredentials[]>;
+  upsertPaymentCredentials(credentials: UpsertPaymentCredentials): Promise<PaymentCredentials>;
+  getAllPaymentMethods(): Promise<PaymentMethod[]>;
+  upsertPaymentMethod(method: UpsertPaymentMethod): Promise<PaymentMethod>;
+  getAllTransactions(): Promise<Transaction[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -181,11 +187,67 @@ export class DatabaseStorage implements IStorage {
     return db
       .select()
       .from(models)
-      .where(and(
-        eq(models.enabled, true),
-        eq(models.isPublic, true)
-      ))
+      .where(eq(models.isPublic, true))
       .orderBy(models.provider, models.displayName);
+  }
+  // Payment operations
+  async getAllPaymentCredentials(): Promise<PaymentCredentials[]> {
+    return db.select().from(paymentCredentials);
+  }
+
+  async upsertPaymentCredentials(data: UpsertPaymentCredentials): Promise<PaymentCredentials> {
+    const [existing] = await db
+      .select()
+      .from(paymentCredentials)
+      .where(eq(paymentCredentials.provider, data.provider));
+
+    if (existing) {
+      const [updated] = await db
+        .update(paymentCredentials)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(paymentCredentials.provider, data.provider))
+        .returning();
+      return updated;
+    }
+
+    const [newCredentials] = await db
+      .insert(paymentCredentials)
+      .values({ ...data, updatedAt: new Date() })
+      .returning();
+    return newCredentials;
+  }
+
+  async getAllPaymentMethods(): Promise<PaymentMethod[]> {
+    return db.select().from(paymentMethods);
+  }
+
+  async upsertPaymentMethod(data: UpsertPaymentMethod): Promise<PaymentMethod> {
+    const [existing] = await db
+      .select()
+      .from(paymentMethods)
+      .where(eq(paymentMethods.name, data.name));
+
+    if (existing) {
+      const [updated] = await db
+        .update(paymentMethods)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(paymentMethods.id, existing.id))
+        .returning();
+      return updated;
+    }
+
+    const [newMethod] = await db
+      .insert(paymentMethods)
+      .values({ ...data, updatedAt: new Date() })
+      .returning();
+    return newMethod;
+  }
+
+  async getAllTransactions(): Promise<Transaction[]> {
+    return db
+      .select()
+      .from(transactions)
+      .orderBy(transactions.createdAt);
   }
 }
 
