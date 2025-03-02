@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { querySchema, updateUserSchema, upsertApiKeySchema, upsertModelSchema } from "@shared/schema";
+import { querySchema, updateUserSchema, upsertApiKeySchema, upsertModelSchema, upsertPaymentCredentialsSchema, upsertPaymentMethodSchema } from "@shared/schema";
 import { ZodError } from "zod";
 import { generateResponse, syncAvailableModels } from "./services/models";
 
@@ -126,6 +126,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Payment Credentials Management
+  app.get("/api/admin/payment-credentials", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    const credentials = await storage.getAllPaymentCredentials();
+    res.json(credentials);
+  });
+
+  app.post("/api/admin/payment-credentials", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    try {
+      const credentialsData = upsertPaymentCredentialsSchema.parse(req.body);
+      const credentials = await storage.upsertPaymentCredentials(credentialsData);
+      res.json(credentials);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        console.error("Error updating payment credentials:", error);
+        res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+      }
+    }
+  });
+
+  // Payment Methods Management
+  app.get("/api/admin/payment-methods", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    const methods = await storage.getAllPaymentMethods();
+    res.json(methods);
+  });
+
+  app.post("/api/admin/payment-methods", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    try {
+      const methodData = upsertPaymentMethodSchema.parse(req.body);
+      const method = await storage.upsertPaymentMethod(methodData);
+      res.json(method);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        res.status(400).json({ error: error.errors });
+      } else {
+        console.error("Error updating payment method:", error);
+        res.status(500).json({ error: error instanceof Error ? error.message : "Internal server error" });
+      }
+    }
+  });
+
+  // Transaction Management
+  app.get("/api/admin/transactions", async (req, res) => {
+    if (!req.isAuthenticated() || !isAdmin(req)) return res.sendStatus(403);
+    const transactions = await storage.getAllTransactions();
+    res.json(transactions);
+  });
+
   // Query route
   app.post("/api/query", async (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
@@ -139,7 +192,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid or disabled model selected" });
       }
 
-      if (user.credits < model.cost) {
+      const totalCost = Math.round((model.inputCost + model.outputCost) / 2);
+      if (user.credits < totalCost) {
         return res.status(402).json({ error: "Insufficient credits" });
       }
 
@@ -150,18 +204,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         prompt,
         model: modelId,
         response,
-        tokens,
-        cost: model.cost,
+        inputTokens: tokens.input,
+        outputTokens: tokens.output,
+        inputCost: Math.round((tokens.input / 1000) * model.inputCost),
+        outputCost: Math.round((tokens.output / 1000) * model.outputCost),
         timestamp: new Date(),
       });
 
-      await storage.updateUserCredits(user.id, user.credits - model.cost);
+      await storage.updateUserCredits(user.id, user.credits - totalCost);
 
       res.json({
         response,
         tokens,
-        cost: model.cost,
-        remainingCredits: user.credits - model.cost,
+        totalCost,
+        remainingCredits: user.credits - totalCost,
       });
     } catch (error) {
       if (error instanceof ZodError) {

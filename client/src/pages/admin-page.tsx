@@ -35,6 +35,36 @@ import { Label } from "@/components/ui/label";
 import { DataTable } from "@/components/ui/data-table";
 import { ColumnDef } from "@tanstack/react-table";
 
+type PaymentCredentials = {
+  id: number;
+  provider: "stripe" | "coinbase" | "direct";
+  enabled: boolean;
+  updatedAt: string;
+};
+
+type PaymentMethod = {
+  id: number;
+  name: string;
+  provider: "stripe" | "coinbase" | "direct";
+  type: "crypto" | "fiat";
+  minAmount: number;
+  enabled: boolean;
+  settings: Record<string, unknown>;
+  updatedAt: string;
+};
+
+type Transaction = {
+  id: number;
+  userId: number;
+  amount: number;
+  credits: number;
+  paymentMethod: string;
+  provider: string;
+  status: string;
+  providerTransactionId?: string;
+  createdAt: string;
+};
+
 type Model = {
   id: number;
   providerId: string;
@@ -104,6 +134,33 @@ export default function AdminPage() {
   const { data: models, isLoading: loadingModels } = useQuery({
     queryKey: ["/api/admin/models"],
   });
+
+  const { data: paymentCredentials, isLoading: loadingPaymentCredentials } = useQuery({
+    queryKey: ["/api/admin/payment-credentials"],
+  });
+
+  const { data: paymentMethods, isLoading: loadingPaymentMethods } = useQuery({
+    queryKey: ["/api/admin/payment-methods"],
+  });
+
+  const { data: transactions, isLoading: loadingTransactions } = useQuery({
+    queryKey: ["/api/admin/transactions"],
+  });
+
+  const [editingPaymentCredentials, setEditingPaymentCredentials] = useState<{
+    provider: "stripe" | "coinbase" | "direct";
+    credentials: Record<string, string>;
+    enabled: boolean;
+  } | null>(null);
+
+  const [editingPaymentMethod, setEditingPaymentMethod] = useState<{
+    name: string;
+    provider: "stripe" | "coinbase" | "direct";
+    type: "crypto" | "fiat";
+    minAmount: number;
+    enabled: boolean;
+    settings: Record<string, unknown>;
+  } | null>(null);
 
   const updateUserMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
@@ -213,7 +270,51 @@ export default function AdminPage() {
     },
   });
 
-  // Update the modelColumns definition here
+  const updatePaymentCredentialsMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/admin/payment-credentials", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-credentials"] });
+      toast({
+        title: "Payment credentials updated",
+        description: "Provider settings have been saved successfully.",
+      });
+      setEditingPaymentCredentials(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updatePaymentMethodMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/admin/payment-methods", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/payment-methods"] });
+      toast({
+        title: "Payment method updated",
+        description: "Payment method has been saved successfully.",
+      });
+      setEditingPaymentMethod(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+
   const modelColumns: ColumnDef<Model>[] = [
     {
       accessorKey: "providerId",
@@ -430,6 +531,421 @@ export default function AdminPage() {
           </CardContent>
         </Card>
 
+        {/* Payment Credentials Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Provider Settings</CardTitle>
+            <CardDescription>Configure payment provider credentials</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingPaymentCredentials ? (
+              <div className="flex justify-center p-4">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <DataTable
+                  columns={[
+                    {
+                      accessorKey: "provider",
+                      header: "Provider",
+                    },
+                    {
+                      accessorKey: "enabled",
+                      header: "Enabled",
+                      cell: ({ row }) => (
+                        <Switch
+                          checked={row.original.enabled}
+                          onCheckedChange={(enabled) =>
+                            updatePaymentCredentialsMutation.mutate({
+                              ...row.original,
+                              enabled,
+                            })
+                          }
+                        />
+                      ),
+                      meta: {
+                        type: 'boolean',
+                      },
+                    },
+                    {
+                      accessorKey: "updatedAt",
+                      header: "Last Updated",
+                      cell: ({ row }) => new Date(row.original.updatedAt).toLocaleString(),
+                    },
+                  ]}
+                  data={paymentCredentials || []}
+                />
+
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button>Add Payment Provider</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Configure Payment Provider</DialogTitle>
+                      <DialogDescription>
+                        Add or update payment provider credentials
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <Select
+                        value={editingPaymentCredentials?.provider}
+                        onValueChange={(value: "stripe" | "coinbase" | "direct") =>
+                          setEditingPaymentCredentials({
+                            provider: value,
+                            credentials: {},
+                            enabled: true,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select provider" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="stripe">Stripe</SelectItem>
+                          <SelectItem value="coinbase">Coinbase Commerce</SelectItem>
+                          <SelectItem value="direct">Direct Crypto</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {editingPaymentCredentials?.provider === "stripe" && (
+                        <>
+                          <div className="space-y-2">
+                            <Label>Secret Key</Label>
+                            <Input
+                              type="password"
+                              value={editingPaymentCredentials.credentials.secretKey || ""}
+                              onChange={(e) =>
+                                setEditingPaymentCredentials({
+                                  ...editingPaymentCredentials,
+                                  credentials: {
+                                    ...editingPaymentCredentials.credentials,
+                                    secretKey: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Publishable Key</Label>
+                            <Input
+                              type="password"
+                              value={editingPaymentCredentials.credentials.publishableKey || ""}
+                              onChange={(e) =>
+                                setEditingPaymentCredentials({
+                                  ...editingPaymentCredentials,
+                                  credentials: {
+                                    ...editingPaymentCredentials.credentials,
+                                    publishableKey: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {editingPaymentCredentials?.provider === "coinbase" && (
+                        <>
+                          <div className="space-y-2">
+                            <Label>API Key</Label>
+                            <Input
+                              type="password"
+                              value={editingPaymentCredentials.credentials.apiKey || ""}
+                              onChange={(e) =>
+                                setEditingPaymentCredentials({
+                                  ...editingPaymentCredentials,
+                                  credentials: {
+                                    ...editingPaymentCredentials.credentials,
+                                    apiKey: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Webhook Secret</Label>
+                            <Input
+                              type="password"
+                              value={editingPaymentCredentials.credentials.webhookSecret || ""}
+                              onChange={(e) =>
+                                setEditingPaymentCredentials({
+                                  ...editingPaymentCredentials,
+                                  credentials: {
+                                    ...editingPaymentCredentials.credentials,
+                                    webhookSecret: e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {editingPaymentCredentials?.provider === "direct" && (
+                        <div className="space-y-2">
+                          <Label>Wallet Address</Label>
+                          <Input
+                            value={editingPaymentCredentials.credentials.walletAddress || ""}
+                            onChange={(e) =>
+                              setEditingPaymentCredentials({
+                                ...editingPaymentCredentials,
+                                credentials: {
+                                  ...editingPaymentCredentials.credentials,
+                                  walletAddress: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      )}
+
+                      <Button
+                        onClick={() => updatePaymentCredentialsMutation.mutate(editingPaymentCredentials)}
+                        disabled={!editingPaymentCredentials?.provider}
+                      >
+                        Save Provider
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Payment Methods Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Payment Methods</CardTitle>
+            <CardDescription>Configure available payment methods and their settings</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingPaymentMethods ? (
+              <div className="flex justify-center p-4">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <DataTable
+                  columns={[
+                    {
+                      accessorKey: "name",
+                      header: "Name",
+                    },
+                    {
+                      accessorKey: "provider",
+                      header: "Provider",
+                    },
+                    {
+                      accessorKey: "type",
+                      header: "Type",
+                    },
+                    {
+                      accessorKey: "minAmount",
+                      header: "Min Amount ($)",
+                      cell: ({ row }) => `$${(row.original.minAmount / 100).toFixed(2)}`,
+                      meta: {
+                        type: 'number',
+                      },
+                    },
+                    {
+                      accessorKey: "enabled",
+                      header: "Enabled",
+                      cell: ({ row }) => (
+                        <Switch
+                          checked={row.original.enabled}
+                          onCheckedChange={(enabled) =>
+                            updatePaymentMethodMutation.mutate({
+                              ...row.original,
+                              enabled,
+                            })
+                          }
+                        />
+                      ),
+                      meta: {
+                        type: 'boolean',
+                      },
+                    },
+                  ]}
+                  data={paymentMethods || []}
+                />
+
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button>Add Payment Method</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Configure Payment Method</DialogTitle>
+                      <DialogDescription>
+                        Add or update a payment method
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label>Name</Label>
+                        <Input
+                          value={editingPaymentMethod?.name || ""}
+                          onChange={(e) =>
+                            setEditingPaymentMethod({
+                              ...editingPaymentMethod!,
+                              name: e.target.value,
+                            })
+                          }
+                          placeholder="e.g., Credit Card, Bitcoin"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Provider</Label>
+                        <Select
+                          value={editingPaymentMethod?.provider}
+                          onValueChange={(value: "stripe" | "coinbase" | "direct") =>
+                            setEditingPaymentMethod({
+                              ...editingPaymentMethod!,
+                              provider: value,
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select provider" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="stripe">Stripe</SelectItem>
+                            <SelectItem value="coinbase">Coinbase Commerce</SelectItem>
+                            <SelectItem value="direct">Direct Crypto</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Type</Label>
+                        <Select
+                          value={editingPaymentMethod?.type}
+                          onValueChange={(value: "crypto" | "fiat") =>
+                            setEditingPaymentMethod({
+                              ...editingPaymentMethod!,
+                              type: value,
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="crypto">Cryptocurrency</SelectItem>
+                            <SelectItem value="fiat">Fiat Currency</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Minimum Amount ($)</Label>
+                        <Input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={editingPaymentMethod?.minAmount ? (editingPaymentMethod.minAmount / 100).toFixed(2) : ""}
+                          onChange={(e) =>
+                            setEditingPaymentMethod({
+                              ...editingPaymentMethod!,
+                              minAmount: Math.round(parseFloat(e.target.value) * 100),
+                            })
+                          }
+                        />
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={editingPaymentMethod?.enabled}
+                          onCheckedChange={(checked) =>
+                            setEditingPaymentMethod({
+                              ...editingPaymentMethod!,
+                              enabled: checked,
+                            })
+                          }
+                        />
+                        <Label>Enabled</Label>
+                      </div>
+
+                      <Button
+                        onClick={() => updatePaymentMethodMutation.mutate(editingPaymentMethod)}
+                        disabled={
+                          !editingPaymentMethod?.name ||
+                          !editingPaymentMethod?.provider ||
+                          !editingPaymentMethod?.type ||
+                          !editingPaymentMethod?.minAmount
+                        }
+                      >
+                        Save Method
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Transactions Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Transaction History</CardTitle>
+            <CardDescription>View all payment transactions</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loadingTransactions ? (
+              <div className="flex justify-center p-4">
+                <Loader2 className="h-8 w-8 animate-spin" />
+              </div>
+            ) : (
+              <DataTable
+                columns={[
+                  {
+                    accessorKey: "createdAt",
+                    header: "Time",
+                    cell: ({ row }) => new Date(row.original.createdAt).toLocaleString(),
+                  },
+                  {
+                    accessorKey: "userId",
+                    header: "User ID",
+                  },
+                  {
+                    accessorKey: "amount",
+                    header: "Amount ($)",
+                    cell: ({ row }) => `$${(row.original.amount / 100).toFixed(2)}`,
+                    meta: {
+                      type: 'number',
+                    },
+                  },
+                  {
+                    accessorKey: "credits",
+                    header: "Credits",
+                    meta: {
+                      type: 'number',
+                    },
+                  },
+                  {
+                    accessorKey: "paymentMethod",
+                    header: "Method",
+                  },
+                  {
+                    accessorKey: "provider",
+                    header: "Provider",
+                  },
+                  {
+                    accessorKey: "status",
+                    header: "Status",
+                  },
+                ]}
+                data={transactions || []}
+              />
+            )}
+          </CardContent>
+        </Card>
+
         {/* Models Card */}
         <Card>
           <CardHeader>
@@ -562,7 +1078,7 @@ export default function AdminPage() {
                         />
                       </div>
 
-                      <div className="space-y-2">
+                      <div className="spacey-2">
                         <Label>Max Tokens</Label>
                         <Input
                           type="number"
