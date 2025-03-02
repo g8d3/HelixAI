@@ -97,26 +97,17 @@ const modelColumns: ColumnDef<Model>[] = [
     accessorKey: "inputCost",
     header: "Input Cost",
     cell: ({ row }) => `$${(row.original.inputCost / 100000).toFixed(4)}/1K tokens`,
+    meta: {
+      type: 'number',
+    },
   },
   {
     accessorKey: "outputCost",
     header: "Output Cost",
     cell: ({ row }) => `$${(row.original.outputCost / 100000).toFixed(4)}/1K tokens`,
-  },
-  {
-    accessorKey: "enabled",
-    header: "Status",
-    cell: ({ row }) => (
-      <Switch
-        checked={row.original.enabled}
-        onCheckedChange={(enabled) =>
-          updateModelMutation.mutate({
-            ...row.original,
-            enabled,
-          })
-        }
-      />
-    ),
+    meta: {
+      type: 'number',
+    },
   },
   {
     accessorKey: "isPublic",
@@ -132,6 +123,9 @@ const modelColumns: ColumnDef<Model>[] = [
         }
       />
     ),
+    meta: {
+      type: 'boolean',
+    },
   },
   {
     id: "actions",

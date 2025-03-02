@@ -20,6 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -57,18 +58,66 @@ export function DataTable<TData, TValue>({
       <div className="flex items-center gap-4">
         {table.getAllColumns()
           .filter((column) => column.getCanFilter())
-          .map((column) => (
-            <div key={column.id} className="flex-1">
-              <Input
-                placeholder={`Filter ${column.id}`}
-                value={(column.getFilterValue() ?? "") as string}
-                onChange={(event) =>
-                  column.setFilterValue(event.target.value)
-                }
-                className="max-w-sm"
-              />
-            </div>
-          ))}
+          .map((column) => {
+            const columnDef = column.columnDef as ColumnDef<TData, any>;
+            if (columnDef.meta?.type === 'boolean') {
+              return (
+                <div key={column.id} className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={(column.getFilterValue() ?? "") as boolean}
+                      onCheckedChange={(value) =>
+                        column.setFilterValue(value ? true : undefined)
+                      }
+                    />
+                    <span>Filter {column.id}</span>
+                  </div>
+                </div>
+              );
+            }
+            if (columnDef.meta?.type === 'number') {
+              return (
+                <div key={column.id} className="flex-1">
+                  <Input
+                    placeholder={`Min ${column.id}`}
+                    value={(column.getFilterValue() as [number, number])?.[0] ?? ""}
+                    onChange={(event) =>
+                      column.setFilterValue((old: [number, number]) => [
+                        event.target.value ? Number(event.target.value) : undefined,
+                        old?.[1],
+                      ])
+                    }
+                    type="number"
+                    className="max-w-[100px] mb-2"
+                  />
+                  <Input
+                    placeholder={`Max ${column.id}`}
+                    value={(column.getFilterValue() as [number, number])?.[1] ?? ""}
+                    onChange={(event) =>
+                      column.setFilterValue((old: [number, number]) => [
+                        old?.[0],
+                        event.target.value ? Number(event.target.value) : undefined,
+                      ])
+                    }
+                    type="number"
+                    className="max-w-[100px]"
+                  />
+                </div>
+              );
+            }
+            return (
+              <div key={column.id} className="flex-1">
+                <Input
+                  placeholder={`Filter ${column.id}`}
+                  value={(column.getFilterValue() ?? "") as string}
+                  onChange={(event) =>
+                    column.setFilterValue(event.target.value)
+                  }
+                  className="max-w-sm"
+                />
+              </div>
+            );
+          })}
       </div>
 
       <div className="rounded-md border">
