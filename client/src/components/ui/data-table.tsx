@@ -99,9 +99,9 @@ export function DataTable<TData, TValue>({
                             if (columnDef.meta?.type === 'boolean') {
                               return (
                                 <Select
-                                  value={(header.column.getFilterValue() ?? "").toString()}
+                                  value={(header.column.getFilterValue() ?? "all").toString()}
                                   onValueChange={(value) => {
-                                    if (value === "") {
+                                    if (value === "all") {
                                       header.column.setFilterValue(undefined);
                                     } else {
                                       header.column.setFilterValue(value === "true");
@@ -112,7 +112,7 @@ export function DataTable<TData, TValue>({
                                     <SelectValue placeholder="Filter..." />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">All</SelectItem>
+                                    <SelectItem value="all">All</SelectItem>
                                     <SelectItem value="true">Yes</SelectItem>
                                     <SelectItem value="false">No</SelectItem>
                                   </SelectContent>
