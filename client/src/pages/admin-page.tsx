@@ -40,6 +40,8 @@ import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Label } from "@/components/ui/label";
+import { DataTable } from "@/components/ui/data-table";
+import { ColumnDef } from "@tanstack/react-table";
 
 type Model = {
   id: number;
@@ -77,6 +79,77 @@ const initialModelForm: ModelFormData = {
   maxTokens: null,
   isPublic: false, // Added default value for isPublic
 };
+
+const modelColumns: ColumnDef<Model>[] = [
+  {
+    accessorKey: "providerId",
+    header: "Model ID",
+  },
+  {
+    accessorKey: "displayName",
+    header: "Display Name",
+  },
+  {
+    accessorKey: "provider",
+    header: "Provider",
+  },
+  {
+    accessorKey: "inputCost",
+    header: "Input Cost",
+    cell: ({ row }) => `$${(row.original.inputCost / 100000).toFixed(4)}/1K tokens`,
+  },
+  {
+    accessorKey: "outputCost",
+    header: "Output Cost",
+    cell: ({ row }) => `$${(row.original.outputCost / 100000).toFixed(4)}/1K tokens`,
+  },
+  {
+    accessorKey: "enabled",
+    header: "Status",
+    cell: ({ row }) => (
+      <Switch
+        checked={row.original.enabled}
+        onCheckedChange={(enabled) =>
+          updateModelMutation.mutate({
+            ...row.original,
+            enabled,
+          })
+        }
+      />
+    ),
+  },
+  {
+    accessorKey: "isPublic",
+    header: "Public",
+    cell: ({ row }) => (
+      <Switch
+        checked={row.original.isPublic}
+        onCheckedChange={(isPublic) =>
+          updateModelMutation.mutate({
+            ...row.original,
+            isPublic,
+          })
+        }
+      />
+    ),
+  },
+  {
+    id: "actions",
+    header: "Actions",
+    cell: ({ row }) => (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          setEditingModel(row.original);
+          setModelDialogOpen(true);
+        }}
+      >
+        Edit
+      </Button>
+    ),
+  },
+];
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -261,8 +334,8 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="border-b fixed top-0 left-0 right-0 bg-background z-50">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Admin Dashboard</h1>
           <div className="flex items-center gap-4">
@@ -273,7 +346,7 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 space-y-8">
+      <main className="container mx-auto px-4 py-8 space-y-8 mt-16">
         <Card>
           <CardHeader>
             <CardTitle>API Provider Keys</CardTitle>
@@ -389,221 +462,11 @@ export default function AdminPage() {
                   </Button>
                 </div>
 
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Model ID</TableHead>
-                      <TableHead>Display Name</TableHead>
-                      <TableHead>Provider</TableHead>
-                      <TableHead>Input Cost</TableHead>
-                      <TableHead>Output Cost</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Public</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {models?.map((model: Model) => (
-                      <TableRow key={model.id}>
-                        <TableCell>{model.providerId}</TableCell>
-                        <TableCell>{model.displayName}</TableCell>
-                        <TableCell>{model.provider}</TableCell>
-                        <TableCell>${(model.inputCost / 100000).toFixed(4)}/1K tokens</TableCell>
-                        <TableCell>${(model.outputCost / 100000).toFixed(4)}/1K tokens</TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={model.enabled}
-                            onCheckedChange={(enabled) =>
-                              updateModelMutation.mutate({
-                                ...model,
-                                enabled,
-                              })
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Switch
-                            checked={model.isPublic}
-                            onCheckedChange={(isPublic) =>
-                              updateModelMutation.mutate({
-                                ...model,
-                                isPublic,
-                              })
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                              setEditingModel(model);
-                              setModelDialogOpen(true);
-                            }}
-                          >
-                            Edit
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-
-                <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>
-                        {editingModel ? 'Edit Model' : 'Add New Model'}
-                      </DialogTitle>
-                    </DialogHeader>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const data = {
-                          ...modelForm,
-                          contextWindow: modelForm.contextWindow || null,
-                          maxTokens: modelForm.maxTokens || null,
-                        };
-                        upsertModelMutation.mutate(data);
-                      }}
-                      className="space-y-4"
-                    >
-                      <div className="space-y-2">
-                        <Label>Provider</Label>
-                        <Select
-                          value={modelForm.provider}
-                          onValueChange={(value: "openai" | "anthropic" | "palm") =>
-                            setModelForm({ ...modelForm, provider: value })
-                          }
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select provider" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="openai">OpenAI</SelectItem>
-                            <SelectItem value="anthropic">Anthropic</SelectItem>
-                            <SelectItem value="palm">Google PaLM</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Model ID</Label>
-                        <Input
-                          value={modelForm.providerId}
-                          onChange={(e) =>
-                            setModelForm({ ...modelForm, providerId: e.target.value })
-                          }
-                          placeholder="e.g., gpt-4"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Display Name</Label>
-                        <Input
-                          value={modelForm.displayName}
-                          onChange={(e) =>
-                            setModelForm({ ...modelForm, displayName: e.target.value })
-                          }
-                          placeholder="e.g., GPT-4"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Input Cost per 1K tokens ($)</Label>
-                        <Input
-                          type="number"
-                          min="0.0001"
-                          step="0.0001"
-                          value={(modelForm.inputCost / 100000).toFixed(4)}
-                          onChange={(e) =>
-                            setModelForm({ ...modelForm, inputCost: Math.round(parseFloat(e.target.value) * 100000) })
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Output Cost per 1K tokens ($)</Label>
-                        <Input
-                          type="number"
-                          min="0.0001"
-                          step="0.0001"
-                          value={(modelForm.outputCost / 100000).toFixed(4)}
-                          onChange={(e) =>
-                            setModelForm({ ...modelForm, outputCost: Math.round(parseFloat(e.target.value) * 100000) })
-                          }
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Context Window</Label>
-                        <Input
-                          type="number"
-                          value={modelForm.contextWindow ?? ""}
-                          onChange={(e) => {
-                            const value = e.target.value ? parseInt(e.target.value) : null;
-                            setModelForm({ ...modelForm, contextWindow: value });
-                          }}
-                          placeholder="Optional"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Max Tokens</Label>
-                        <Input
-                          type="number"
-                          value={modelForm.maxTokens ?? ""}
-                          onChange={(e) => {
-                            const value = e.target.value ? parseInt(e.target.value) : null;
-                            setModelForm({ ...modelForm, maxTokens: value });
-                          }}
-                          placeholder="Optional"
-                        />
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={modelForm.enabled}
-                          onCheckedChange={(checked) =>
-                            setModelForm({ ...modelForm, enabled: checked })
-                          }
-                        />
-                        <Label>Enabled</Label>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={modelForm.isPublic}
-                          onCheckedChange={(checked) =>
-                            setModelForm({ ...modelForm, isPublic: checked })
-                          }
-                        />
-                        <Label>Show on Home Page</Label>
-                      </div>
-
-                      <div className="flex justify-end space-x-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setModelDialogOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="submit"
-                          disabled={
-                            !modelForm.providerId ||
-                            !modelForm.displayName ||
-                            !modelForm.provider ||
-                            modelForm.inputCost < 1000 ||
-                            modelForm.outputCost < 1000
-                          }
-                        >
-                          {editingModel ? 'Update' : 'Create'}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                <DataTable
+                  columns={modelColumns}
+                  data={models || []}
+                  defaultSort={{ id: "isPublic", desc: true }}
+                />
               </div>
             )}
           </CardContent>

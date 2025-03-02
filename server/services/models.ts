@@ -28,20 +28,35 @@ async function fetchOpenAIModels() {
 
   return response.data
     .filter(model => model.id.includes('gpt'))
-    .map(model => ({
-      providerId: model.id,
-      displayName: model.id.split('-').map(word => 
-        word.charAt(0).toUpperCase() + word.slice(1)
-      ).join(' '),
-      provider: 'openai' as const,
-      // Convert USD/1K tokens to integer (multiply by 100000)
-      // GPT-4: Input $0.03, Output $0.06 per 1K tokens
-      // GPT-3.5: Input $0.0015, Output $0.002 per 1K tokens
-      inputCost: model.id.includes('gpt-4') ? 3000 : 150,
-      outputCost: model.id.includes('gpt-4') ? 6000 : 200,
-      contextWindow: model.context_window,
-      maxTokens: model.context_window,
-    }));
+    .map(model => {
+      // Determine costs based on model ID
+      let inputCost, outputCost;
+      if (model.id.includes('gpt-4')) {
+        if (model.id.includes('turbo')) {
+          inputCost = 1000;  // $0.01/1K tokens
+          outputCost = 3000; // $0.03/1K tokens
+        } else {
+          inputCost = 3000;  // $0.03/1K tokens
+          outputCost = 6000; // $0.06/1K tokens
+        }
+      } else {
+        // GPT-3.5 pricing
+        inputCost = 150;   // $0.0015/1K tokens
+        outputCost = 200;  // $0.002/1K tokens
+      }
+
+      return {
+        providerId: model.id,
+        displayName: model.id.split('-').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' '),
+        provider: 'openai' as const,
+        inputCost,
+        outputCost,
+        contextWindow: 128000, // Updated to latest context windows
+        maxTokens: 128000,
+      };
+    });
 }
 
 async function fetchAnthropicModels() {
@@ -165,7 +180,7 @@ export async function generateResponse(
       case "anthropic": {
         const message = await (client as Anthropic).messages.create({
           model: "claude-2",
-          max_tokens: modelConfig.maxTokens,
+          max_tokens: modelConfig.maxTokens ?? undefined,
           messages: [{ role: "user", content: prompt }],
         });
         return {
@@ -177,8 +192,8 @@ export async function generateResponse(
 
       case "palm": {
         const model = (client as GoogleGenerativeAI).getGenerativeModel({ model: "gemini-pro" });
-        const result = await model.generateText(prompt);
-        const response = result.text();
+        const result = await model.generateContent(prompt);
+        const response = result.response.text();
         return {
           response,
           // Estimate tokens until PaLM provides usage info
