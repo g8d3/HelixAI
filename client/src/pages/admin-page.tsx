@@ -213,7 +213,7 @@ export default function AdminPage() {
     },
   });
 
-  // Move column definitions here to access mutations
+  // Update the modelColumns definition here
   const modelColumns: ColumnDef<Model>[] = [
     {
       accessorKey: "providerId",

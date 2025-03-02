@@ -69,18 +69,21 @@ export function DataTable<TData, TValue>({
     <div className="space-y-4">
       <div className="rounded-md border">
         <div className="relative">
-          {/* Table container with fixed height and scrolling */}
-          <div className="h-[600px] overflow-auto">
+          {/* Table container with dynamic height */}
+          <div style={{
+            minHeight: '200px',
+            maxHeight: '600px',
+            overflow: 'auto'
+          }}>
             <Table>
               {/* Fixed header */}
-              <TableHeader className="sticky top-0">
+              <TableHeader>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id}>
                     {headerGroup.headers.map((header) => (
                       <TableHead
                         key={header.id}
-                        // Add styles for sticky header
-                        className="bg-background sticky top-0"
+                        className="sticky top-0 bg-background border-b z-20"
                       >
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
