@@ -20,7 +20,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ArrowUpDown } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -37,7 +43,6 @@ export function DataTable<TData, TValue>({
     defaultSort ? [defaultSort] : []
   );
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [frozenColumns, setFrozenColumns] = useState<string[]>([]);
 
   const table = useReactTable({
     data,
@@ -54,182 +59,144 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-4">
-        {table.getAllColumns()
-          .filter((column) => column.getCanFilter())
-          .map((column) => {
-            const columnDef = column.columnDef as ColumnDef<TData, any>;
-            if (columnDef.meta?.type === 'boolean') {
-              return (
-                <div key={column.id} className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Switch
-                      checked={(column.getFilterValue() ?? "") as boolean}
-                      onCheckedChange={(value) =>
-                        column.setFilterValue(value ? true : undefined)
-                      }
-                    />
-                    <span>Filter {column.id}</span>
-                  </div>
-                </div>
-              );
-            }
-            if (columnDef.meta?.type === 'number') {
-              return (
-                <div key={column.id} className="flex-1">
-                  <Input
-                    placeholder={`Min ${column.id}`}
-                    value={(column.getFilterValue() as [number, number])?.[0] ?? ""}
-                    onChange={(event) =>
-                      column.setFilterValue((old: [number, number]) => [
-                        event.target.value ? Number(event.target.value) : undefined,
-                        old?.[1],
-                      ])
-                    }
-                    type="number"
-                    className="max-w-[100px] mb-2"
-                  />
-                  <Input
-                    placeholder={`Max ${column.id}`}
-                    value={(column.getFilterValue() as [number, number])?.[1] ?? ""}
-                    onChange={(event) =>
-                      column.setFilterValue((old: [number, number]) => [
-                        old?.[0],
-                        event.target.value ? Number(event.target.value) : undefined,
-                      ])
-                    }
-                    type="number"
-                    className="max-w-[100px]"
-                  />
-                </div>
-              );
-            }
-            return (
-              <div key={column.id} className="flex-1">
-                <Input
-                  placeholder={`Filter ${column.id}`}
-                  value={(column.getFilterValue() ?? "") as string}
-                  onChange={(event) =>
-                    column.setFilterValue(event.target.value)
-                  }
-                  className="max-w-sm"
-                />
-              </div>
-            );
-          })}
-      </div>
-
-      <div className="rounded-md border">
-        <div className="max-h-[600px] overflow-auto">
-          <Table>
-            <TableHeader className="sticky top-0 bg-background z-10">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
-                  {headerGroup.headers.map((header) => {
-                    const isFrozen = frozenColumns.includes(header.column.id);
-                    return (
-                      <TableHead
-                        key={header.id}
-                        className={`${
-                          isFrozen
-                            ? "sticky left-0 bg-background z-20"
-                            : ""
-                        }`}
-                      >
-                        {header.isPlaceholder ? null : (
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={
-                                header.column.getCanSort()
-                                  ? "cursor-pointer select-none"
-                                  : ""
-                              }
-                              onClick={header.column.getToggleSortingHandler()}
-                            >
-                              {flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
-                            </div>
-                            {header.column.getCanSort() && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0"
-                              >
-                                <ArrowUpDown className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              onClick={() => {
-                                if (isFrozen) {
-                                  setFrozenColumns(
-                                    frozenColumns.filter(
-                                      (id) => id !== header.column.id
-                                    )
-                                  );
-                                } else {
-                                  setFrozenColumns([
-                                    ...frozenColumns,
-                                    header.column.id,
-                                  ]);
-                                }
-                              }}
-                            >
-                              📌
-                            </Button>
-                          </div>
-                        )}
-                      </TableHead>
-                    );
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                  >
-                    {row.getVisibleCells().map((cell) => {
-                      const isFrozen = frozenColumns.includes(cell.column.id);
-                      return (
-                        <TableCell
-                          key={cell.id}
-                          className={`${
-                            isFrozen
-                              ? "sticky left-0 bg-background"
+    <div className="rounded-md border">
+      <div className="max-h-[600px] overflow-auto">
+        <Table>
+          <TableHeader className="sticky top-0 bg-background z-10">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id}>
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id}>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={
+                            header.column.getCanSort()
+                              ? "cursor-pointer select-none"
                               : ""
-                          }`}
+                          }
+                          onClick={header.column.getToggleSortingHandler()}
                         >
                           {flexRender(
-                            cell.column.columnDef.cell,
-                            cell.getContext()
+                            header.column.columnDef.header,
+                            header.getContext()
                           )}
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={columns.length}
-                    className="h-24 text-center"
-                  >
-                    No results.
-                  </TableCell>
+                        </div>
+                        {header.column.getCanSort() && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                          >
+                            <ArrowUpDown className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                      {header.column.getCanFilter() && (
+                        <div>
+                          {(() => {
+                            const columnDef = header.column.columnDef as ColumnDef<TData, any>;
+                            if (columnDef.meta?.type === 'boolean') {
+                              return (
+                                <Select
+                                  value={(header.column.getFilterValue() ?? "").toString()}
+                                  onValueChange={(value) => {
+                                    if (value === "") {
+                                      header.column.setFilterValue(undefined);
+                                    } else {
+                                      header.column.setFilterValue(value === "true");
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="h-8 w-[120px]">
+                                    <SelectValue placeholder="Filter..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="">All</SelectItem>
+                                    <SelectItem value="true">Yes</SelectItem>
+                                    <SelectItem value="false">No</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              );
+                            }
+                            if (columnDef.meta?.type === 'number') {
+                              return (
+                                <div className="flex gap-2">
+                                  <Input
+                                    placeholder="Min"
+                                    value={(header.column.getFilterValue() as [number, number])?.[0] ?? ""}
+                                    onChange={(event) =>
+                                      header.column.setFilterValue((old: [number, number]) => [
+                                        event.target.value ? Number(event.target.value) : undefined,
+                                        old?.[1],
+                                      ])
+                                    }
+                                    type="number"
+                                    className="h-8 w-[80px]"
+                                  />
+                                  <Input
+                                    placeholder="Max"
+                                    value={(header.column.getFilterValue() as [number, number])?.[1] ?? ""}
+                                    onChange={(event) =>
+                                      header.column.setFilterValue((old: [number, number]) => [
+                                        old?.[0],
+                                        event.target.value ? Number(event.target.value) : undefined,
+                                      ])
+                                    }
+                                    type="number"
+                                    className="h-8 w-[80px]"
+                                  />
+                                </div>
+                              );
+                            }
+                            return (
+                              <Input
+                                placeholder="Filter..."
+                                value={(header.column.getFilterValue() ?? "") as string}
+                                onChange={(event) =>
+                                  header.column.setFilterValue(event.target.value)
+                                }
+                                className="h-8 max-w-sm"
+                              />
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && "selected"}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(
+                        cell.column.columnDef.cell,
+                        cell.getContext()
+                      )}
+                    </TableCell>
+                  ))}
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
+                  No results.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );

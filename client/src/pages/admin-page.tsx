@@ -229,16 +229,16 @@ export default function AdminPage() {
     },
     {
       accessorKey: "inputCost",
-      header: "Input Cost",
-      cell: ({ row }) => `$${(row.original.inputCost / 100000).toFixed(4)}/1K tokens`,
+      header: "Input Cost ($/1K tokens)",
+      cell: ({ row }) => `$${(row.original.inputCost / 100000).toFixed(4)}`,
       meta: {
         type: 'number',
       },
     },
     {
       accessorKey: "outputCost",
-      header: "Output Cost",
-      cell: ({ row }) => `$${(row.original.outputCost / 100000).toFixed(4)}/1K tokens`,
+      header: "Output Cost ($/1K tokens)",
+      cell: ({ row }) => `$${(row.original.outputCost / 100000).toFixed(4)}`,
       meta: {
         type: 'number',
       },
@@ -270,6 +270,17 @@ export default function AdminPage() {
           size="sm"
           onClick={() => {
             setEditingModel(row.original);
+            setModelForm({
+              providerId: row.original.providerId,
+              displayName: row.original.displayName,
+              provider: row.original.provider,
+              inputCost: row.original.inputCost,
+              outputCost: row.original.outputCost,
+              enabled: row.original.enabled,
+              contextWindow: row.original.contextWindow ?? null,
+              maxTokens: row.original.maxTokens ?? null,
+              isPublic: row.original.isPublic,
+            });
             setModelDialogOpen(true);
           }}
         >
@@ -459,16 +470,144 @@ export default function AdminPage() {
                     <form
                       onSubmit={(e) => {
                         e.preventDefault();
-                        const data = {
-                          ...modelForm,
-                          contextWindow: modelForm.contextWindow || null,
-                          maxTokens: modelForm.maxTokens || null,
-                        };
-                        upsertModelMutation.mutate(data);
+                        upsertModelMutation.mutate(modelForm);
                       }}
                       className="space-y-4"
                     >
-                      {/* Form fields remain the same */}
+                      <div className="space-y-2">
+                        <Label>Provider</Label>
+                        <Select
+                          value={modelForm.provider}
+                          onValueChange={(value: "openai" | "anthropic" | "palm") =>
+                            setModelForm({ ...modelForm, provider: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select provider" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="openai">OpenAI</SelectItem>
+                            <SelectItem value="anthropic">Anthropic</SelectItem>
+                            <SelectItem value="palm">Google PaLM</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Model ID</Label>
+                        <Input
+                          value={modelForm.providerId}
+                          onChange={(e) =>
+                            setModelForm({ ...modelForm, providerId: e.target.value })
+                          }
+                          placeholder="e.g., gpt-4"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Display Name</Label>
+                        <Input
+                          value={modelForm.displayName}
+                          onChange={(e) =>
+                            setModelForm({ ...modelForm, displayName: e.target.value })
+                          }
+                          placeholder="e.g., GPT-4"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Input Cost per 1K tokens ($)</Label>
+                        <Input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          value={(modelForm.inputCost / 100000).toFixed(4)}
+                          onChange={(e) =>
+                            setModelForm({ ...modelForm, inputCost: Math.round(parseFloat(e.target.value) * 100000) })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Output Cost per 1K tokens ($)</Label>
+                        <Input
+                          type="number"
+                          min="0.0001"
+                          step="0.0001"
+                          value={(modelForm.outputCost / 100000).toFixed(4)}
+                          onChange={(e) =>
+                            setModelForm({ ...modelForm, outputCost: Math.round(parseFloat(e.target.value) * 100000) })
+                          }
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Context Window</Label>
+                        <Input
+                          type="number"
+                          value={modelForm.contextWindow ?? ""}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseInt(e.target.value) : null;
+                            setModelForm({ ...modelForm, contextWindow: value });
+                          }}
+                          placeholder="Optional"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Max Tokens</Label>
+                        <Input
+                          type="number"
+                          value={modelForm.maxTokens ?? ""}
+                          onChange={(e) => {
+                            const value = e.target.value ? parseInt(e.target.value) : null;
+                            setModelForm({ ...modelForm, maxTokens: value });
+                          }}
+                          placeholder="Optional"
+                        />
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={modelForm.enabled}
+                          onCheckedChange={(checked) =>
+                            setModelForm({ ...modelForm, enabled: checked })
+                          }
+                        />
+                        <Label>Enabled</Label>
+                      </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={modelForm.isPublic}
+                          onCheckedChange={(checked) =>
+                            setModelForm({ ...modelForm, isPublic: checked })
+                          }
+                        />
+                        <Label>Show on Home Page</Label>
+                      </div>
+
+                      <div className="flex justify-end space-x-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setModelDialogOpen(false)}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="submit"
+                          disabled={
+                            !modelForm.providerId ||
+                            !modelForm.displayName ||
+                            !modelForm.provider ||
+                            modelForm.inputCost < 1 ||
+                            modelForm.outputCost < 1
+                          }
+                        >
+                          {editingModel ? 'Update' : 'Create'}
+                        </Button>
+                      </div>
                     </form>
                   </DialogContent>
                 </Dialog>
