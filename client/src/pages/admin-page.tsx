@@ -365,6 +365,14 @@ export default function AdminPage() {
                       header: "Provider",
                     },
                     {
+                      accessorKey: "apiKey",
+                      header: "API Key",
+                      cell: ({ row }) => {
+                        const key = row.original.apiKey;
+                        return `${key.slice(0, 4)}...${key.slice(-4)}`;
+                      },
+                    },
+                    {
                       accessorKey: "updatedAt",
                       header: "Last Updated",
                       cell: ({ row }) => new Date(row.original.updatedAt).toLocaleString(),

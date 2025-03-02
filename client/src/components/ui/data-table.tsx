@@ -45,6 +45,7 @@ export function DataTable<TData, TValue>({
   );
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [pageSize, setPageSize] = useState(20);
+  const [pageIndex, setPageIndex] = useState(0);
 
   const table = useReactTable({
     data,
@@ -60,8 +61,18 @@ export function DataTable<TData, TValue>({
       columnFilters,
       pagination: {
         pageSize,
-        pageIndex: 0,
+        pageIndex,
       },
+    },
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        const newState = updater(table.getState().pagination);
+        setPageIndex(newState.pageIndex);
+        setPageSize(newState.pageSize);
+      } else {
+        setPageIndex(updater.pageIndex);
+        setPageSize(updater.pageSize);
+      }
     },
   });
 
@@ -226,7 +237,9 @@ export function DataTable<TData, TValue>({
           </p>
           <Select
             value={pageSize.toString()}
-            onValueChange={(value) => setPageSize(Number(value))}
+            onValueChange={(value) => {
+              table.setPageSize(Number(value));
+            }}
           >
             <SelectTrigger className="h-8 w-[70px]">
               <SelectValue/>
